@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	  David Fishburn <fishburn@ianywhere.com>
 "   Date:	  Nov 23, 2002
-"   Last Changed: Thu Dec 02 2004 12:21:26 PM
-"   Version:	  1.3.8
+"   Last Changed: Thu Feb 10 2005 10:47:57 AM
+"   Version:	  1.3.9
 "   Script:	  http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -341,11 +341,11 @@ function! s:SQLU_WrapperStart( beginline, endline, mode )
     let b:keepcol_mz  = virtcol("'z")
 
     silent! exec 'norm! '.a:endline."G\<bar>0\<bar>"
-    " Add a new line to the bottom of the mark to be removed latter
+    " Add a new line to the bottom of the mark to be removed later
     put =''
     silent! exec "ma z"
     silent! exec 'norm! '.a:beginline."G\<bar>0\<bar>"
-    " Add a new line above the mark to be removed latter
+    " Add a new line above the mark to be removed later
     put! = ''
     silent! exec "ma y"
     let b:cmdheight= &cmdheight
@@ -550,8 +550,10 @@ function! s:SQLU_ReformatStatement()
     " The CASE statement and the Oracle MERGE statement are very similar.
     " I have changed the WHEN clause to check to see if it is followed
     " by [NOT] MATCHED, if so, do not match the WHEN
-    let sql_case_keywords = '\(\<end\s\+\)\@<!case'.
-                \ '\|\<when\>\(\%(-@-\)\?\s*\%(not\s\+\)\?matched\)\@!\|else\|end\( case\)\?'
+    let sql_case_keywords = '\(\<end\s\+\)\@<!case' .
+                \ '\|\<when\>\(\%(-@-\)\?\s*\%(not\s\+\)\?matched\)\@!' .
+                \ '\|else\|end\(\s\+case\)\?' 
+
     " echom 'case: '.sql_case_keywords
     " The case keywords must not be proceeded by a -@-
     silent! exec "'y+1,'z-1".'s/'.
@@ -565,28 +567,6 @@ function! s:SQLU_ReformatStatement()
     " Using the Align.vim plugin, reformat the lines
     " so that the keywords are RIGHT justified
     AlignCtrl default
-
-    " Replace the space after the first word on each line with 
-    " -@- to align on this later
-    " silent! 'y+1,'z-1s/^\(\s*\)\([a-zA-Z0-9_]*\) /\1\2-@-
-
-    " if g:sqlutil_keyword_case == 'U'
-    "     " If the user has specified, convert keywords to UPPER CASE
-    "     let cmd = "'y+1,'z-1".'s/\<\(' .
-    "                 \ sql_keywords .
-    "                 \ '\|' .
-    "                 \ sql_case_keywords .
-    "                 \ '\)\>/\U\1/gei'
-    "     silent! exec cmd
-    " elseif g:sqlutil_keyword_case == 'L'
-    "     " If the user has specified, convert keywords to lower case
-    "     let cmd = "'y+1,'z-1".'s/\<\(' .
-    "                 \ sql_keywords .
-    "                 \ '\|' .
-    "                 \ sql_case_keywords .
-    "                 \ '\)\>/\L\1/gei'
-    "     silent! exec cmd
-    " endif
 
     let cmd = "'y+1,'z-1".'s/\<\(' .
                 \ sql_keywords .
@@ -963,55 +943,46 @@ function! s:SQLU_WrapAtCommas()
         if line =~? '\w'
             if line =~? '^\s*\<\('.sql_keywords.'\)\>'
                 silent! exec linenum 
-		" silent! exec linenum . ',' . linenum . 's/\w\+\zs\s\+/-@-'
-
-                " Mark the start of the wide line
+                " Mark the start of the line
                 silent! exec "normal mb"
                 " echom "line b - ".getline("'b")
                 " Mark the next line
                 silent! exec "normal jmek"
 
-		let index = match(getline(linenum), '[,(]')
-		while index > -1
-		    " Go to character
-		    silent! exe 'norm! '.linenum."G\<bar>".
-				\ index.(index>0 ? 'l' : '' )
+                let saved_linenum = linenum
+                let index = match(getline(linenum), '[,(]')
+                while index > -1
+                    " Go to character
+                    call cursor(linenum, (index+1))
 
-		    if getline(linenum)[col(".")-1] == '('
-			if searchpair( '(', '', ')', '' ) > 0
-			    if line(".") != linenum
-				break
-			    else
-				let index = col(".")
-			    endif
-			endif
-		    else
-			" Given the current cursor position, replace
-			" the , and any following whitespace
-			" with a newline and the special -@- character
-			" for Align
-			silent! exec linenum . ',' . linenum . 
-				    \ 's/\%' . (index + 1) . 'c,\s*' .
-				    \ '/\r,-@-'
-			let linenum = linenum + 1
-			" Find the index of the first non-white space
-			" which should be the , we just put on the 
-			" newline
-			let index = match(getline(linenum), '\S')
-			let index = index + 1
-		    endif
+                    if getline(linenum)[col(".")-1] == '('
+                        if searchpair( '(', '', ')', '' ) > 0
+                            let linenum = line(".")
+                            let index   = col(".")
+                        endif
+                    else
+                        " Given the current cursor position, replace
+                        " the , and any following whitespace
+                        " with a newline and the special -@- character
+                        " for Align
+                        silent! exec linenum . ',' . linenum . 
+                                    \ 's/\%' . (index + 1) . 'c,\s*' .
+                                    \ '/\r,-@-'
+                        let linenum = linenum + 1
+                        " Find the index of the first non-white space
+                        " which should be the , we just put on the 
+                        " newline
+                        let index = match(getline(linenum), '\S')
+                        let index = index + 1
+                    endif
 
-		    " then continue on for the remainder of the line
-		    " looking for the next , or (
-		    "
-		    " Must figure out what index value to start from
-		    let index = match( getline(linenum), '[,(]', index )
-		endwhile
-
-                " AlignCtrl Ip0P0rl:
-                " silent! 'b,'e-Align -@-
-                " silent! 'b,'e-s/-@-/ /
-                " AlignCtrl default
+                    " then continue on for the remainder of the line
+                    " looking for the next , or (
+                    "
+                    " Must figure out what index value to start from
+                    let index = match( getline(linenum), '[,(]', index )
+                endwhile
+                let linenum = saved_linenum 
 
                 " Go to the end of the new lines
                 silent! exec "'e-" 
