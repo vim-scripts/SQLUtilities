@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	  David Fishburn <fishburn@ianywhere.com>
 "   Date:	  Nov 23, 2002
-"   Last Changed: Fri Mar 05 2004 10:06:19 PM
-"   Version:	  1.3.5
+"   Last Changed: Mon Jun 21 2004 10:03:30
+"   Version:	  1.3.6
 "   Script:	  http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -284,6 +284,12 @@ function! s:SQLU_ReformatStatement()
     "           FOR UPDATE
     let sql_update_keywords = '' . 
                 \ '\%(\%(\<\%(for\|existing\)\s\+\)\@<!update\)'
+    " WINDOW clauses can be used in both the SELECT list
+    " and after the HAVING clause.
+    let sql_window_keywords = '' . 
+                \ 'over\|partition\s\+by\|' .
+                \ '\%(rows\|range\)\s\+' .
+                \ '\%(between\|unbounded\|current\|preceding\|following\)'
     " INTO clause can be used in a SELECT statement as well 
     " as an INSERT statement.  We do not want to place INTO
     " on a newline if it is preceeded by INSERT
@@ -314,6 +320,15 @@ function! s:SQLU_ReformatStatement()
     " by [not] matched
     let sql_merge_keywords = '' . 
                 \ '\%(merge\s\+into\)\|\%(when\(\s\+\%(not\s\+\)\?matched\)\@=\)'
+    " Some additional Oracle keywords from the SQL Reference for SELECT
+    let sql_ora_keywords = '' .
+                \ '\%(dimension\s\+by\|' .
+                \ 'measures\s*(\|' .
+                \ 'iterate\s*(\|' .
+                \ 'within\s\+group\|' .
+                \ '\%(ignore\|keep\)\s\+nav\|' .
+                \ 'return\s\+\%(updated\|all\)\|' .
+                \ 'rules\s\+\%(upsert\|update\)\)'
     " FROM clause can be used in a DELETE statement as well 
     " as a SELECT statement.  We do not want to place FROM
     " on a newline if it is preceeded by DELETE
@@ -346,7 +361,7 @@ function! s:SQLU_ReformatStatement()
                 \ '\%(\%(\%(cross\)\?\s*\)\?join\)' .
                 \ '\)'
     " force each keyword onto a newline
-    let sql_keywords =  'create\|drop\|call\|select\|set\|values\|' .
+    let sql_keywords =  '\<\%(create\|drop\|call\|select\|set\|values\|' .
                 \ sql_update_keywords . '\|' .
                 \ sql_into_keywords . '\|' .
                 \ sql_and_between_keywords . '\|' .
@@ -355,12 +370,15 @@ function! s:SQLU_ReformatStatement()
                 \ sql_subscribe_keywords . '\|' .
                 \ sql_connect_by_keywords . '\|' .
                 \ sql_merge_keywords . '\|' .
-                \ 'on\|where\|or\|order\s\+\%(\w\+\s\+\)\?by\|group\s\+by\|' .
+                \ sql_ora_keywords . '\|' .
+                \ 'on\|where\|or\|order\s\+\%(\w\+\s\+\)\?by\|'.
+                \ 'group\s\+by\|' .
+                \ sql_window_keywords . '\|' .
                 \ 'having\|for\|insert\|using\|' .
                 \ 'intersect\|except\|window\|' .
                 \ '\%(union\%(\s\+all\)\?\)\|' .
                 \ 'start\s\+with\|' .
-                \ '\%(\%(\<start\s\+\)\@<!with\)'
+                \ '\%(\%(\<start\s\+\)\@<!with\)\)\>'
     " The user can specify whether to align the statements based on 
     " the first word, or on the matching string.
     "     let g:sqlutil_align_first_word = 0
@@ -505,8 +523,8 @@ function! s:SQLU_IndentNestedBlocks()
         let &textwidth = winwidth(winnr())
     endif
     
-    let sql_keywords = 'select\|set\|\(insert\s*\)\?into\|from\|values'.
-                \ '\|order\|group\|having\|return\|call'
+    let sql_keywords = '\<\%(select\|set\|\%(insert\s\+\)\?into\|from\|values'.
+                \ '\|order\|group\|having\|return\|call\)\>'
 
     " Indent nested blocks surrounded by ()s.
     let linenum = line("'y+1")
@@ -674,8 +692,9 @@ function! s:SQLU_WrapFunctionCalls()
         let curr_textwidth = org_textwidth
     endif
 
-    let sql_keywords = 'select\|set\|\(insert\(-@-\)\?\)into\|from\|values'.
-                \ '\|order\|group\|having\|return\|with'
+    let sql_keywords = '\<\%(select\|set\|\%(insert\(-@-\)\?\)into' .
+                \ '\|from\|values'.
+                \ '\|order\|group\|having\|return\|with\)\>'
 
     " Useful in the debugger
     " echo linenum.' '.func_call.' '.virtcol(".").' 
@@ -802,7 +821,7 @@ endfunction
 function! s:SQLU_WrapAtCommas()
     let linenum = line("'y+1")
 
-    let sql_keywords = 'select\|set\|into\|from\|values'
+    let sql_keywords = '\<\%(select\|set\|into\|from\|values\)\>'
 
     " call Decho(" Before column splitter 'y+1=".line("'<").
     " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
@@ -888,8 +907,8 @@ function! s:SQLU_WrapLongLines()
         let &textwidth = winwidth(winnr())
     endif
 
-    let sql_keywords = 'select\|set\|into\|from\|values'.
-                \ '\|order\|group\|having\|call\|with'
+    let sql_keywords = '\<\%(select\|set\|into\|from\|values'.
+                \ '\|order\|group\|having\|call\|with\)\>'
 
     " call Decho(" Before column splitter 'y+1=".line("'<").
     " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
