@@ -1,304 +1,18 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	  David Fishburn <fishburn@ianywhere.com>
 "   Date:	  Nov 23, 2002
-"   Last Changed: Fri Sep 05 2003 2:05:33 PM
-"   Version:	  1.3.3
+"   Last Changed: Fri Mar 05 2004 10:06:19 PM
+"   Version:	  1.3.5
 "   Script:	  http://www.vim.org/script.php?script_id=492
+"   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
 "   Dependencies:
 "        Align.vim - Version 15 (as a minimum)
 "                  - Author: Charles E. Campbell, Jr.
 "                  - http://www.vim.org/script.php?script_id=294
+"   Documentation:
+"        :h SQLUtilities.txt 
 "
-"   Suggested (Complementary) Plugins:
-"        db_ext.vim - Author: Peter Bagyinszki and David Fishburn
-"                   - http://www.vim.org/script.php?script_id=356
-"
-"   Functions:
-"   [range]SQLUFormatter(..list..)
-"
-"        Formats SQL statements into a easily readable form.
-"        Breaks keywords onto new lines.
-"        Forces column lists to be split over as many lines as
-"        necessary to fit the current textwidth of the buffer,
-"        so that lines do not wrap.
-"        If parentheses are unbalanced (ie a subselect) it will
-"        indent everything within the unbalanced paranthesis.
-"        Works for SELECT, INSERT, UPDATE, DELETE statements.
-"
-"   Examples:
-"
-"     Original:
-"     SELECT m.MSG_ID, m.PRIORITY_ID, CUST.CUST_NBR, CUST.CUST_NM, 
-"     CUST.CUST_LEGAL_NM, CUST.STORE_ADDR_1, CUST.STORE_ADDR_2, 
-"     CUST.CROSS_STREET, XMLELEMENT( 'Alerts', XMLELEMENT( 'Alert_alert_id', 
-"     alert_id ), XMLELEMENT( 'Alert_agent_id', agent_id ), XMLELEMENT( 
-"     'Alert_alert_type_id', alert_type_desc), XMLELEMENT( 
-"     'Alert_alert_date', alert_date), XMLELEMENT( 
-"     'Alert_url_reference', url_reference), XMLELEMENT( 
-"     'Alert_read_status', read_status )) CUST.STORE_CITY, 
-"     CUST.STORE_ST, CUST.POST_CODE, CUST.STORE_MGR_NM, FROM MESSAGES m JOIN 
-"     PRIORITY_CD P WHERE m.to_person_id = ?  AND p.NAME = 'PRI_EMERGENCY' AND 
-"     p.JOB = 'Plumber' AND m.status_id < ( SELECT s.STATUS_ID FROM 
-"     MSG_STATUS_CD s WHERE s.NAME = 'MSG_READ') ORDER BY m.msg_id desc
-"     
-"
-"     Formatted:
-"     SELECT m.MSG_ID, m.PRIORITY_ID, CUST.CUST_NBR, CUST.CUST_NM,
-"            CUST.CUST_LEGAL_NM, CUST.STORE_ADDR_1, CUST.STORE_ADDR_2,
-"            CUST.CROSS_STREET,
-"            XMLELEMENT(
-"                'Alerts', XMLELEMENT( 'Alert_alert_id', alert_id ),
-"                XMLELEMENT( 'Alert_agent_id', agent_id ),
-"                XMLELEMENT( 'Alert_alert_type_id', alert_type_desc),
-"                XMLELEMENT( 'Alert_alert_date', alert_date),
-"                XMLELEMENT(
-"                    'Alert_url_reference', url_reference
-"                 ), XMLELEMENT( 'Alert_read_status', read_status )
-"            ) CUST.STORE_CITY, CUST.STORE_ST, CUST.POST_CODE, 
-"            CUST.STORE_MGR_NM
-"       FROM MESSAGES m
-"       JOIN PRIORITY_CD P
-"      WHERE m.to_person_id = ?
-"        AND p.NAME = 'PRI_EMERGENCY'
-"        AND p.JOB = 'Plumber'
-"        AND m.status_id < (
-"             SELECT s.STATUS_ID
-"               FROM MSG_STATUS_CD s
-"              WHERE s.NAME = 'MSG_READ'
-"            )
-"      ORDER BY m.msg_id desc
-"     
-"     
-"
-"     Original:
-"     UPDATE "SERVICE_REQUEST" SET "BUILDING_ID" = ?, "UNIT_ID" = ?, 
-"     "REASON_ID" = ?, "PERSON_ID" = ?, "PRIORITY_ID" = ?, "STATUS_ID" = ?, 
-"     "CREATED" = ?, "REQUESTED" = ?, "ARRIVED" = ?  WHERE "REQUEST_ID" = ?
-"
-"
-"     Formatted:
-"     UPDATE "SERVICE_REQUEST"
-"        SET "BUILDING_ID" = ?,
-"            "UNIT_ID" = ?,
-"            "REASON_ID" = ?,
-"            "PERSON_ID" = ?,
-"            "PRIORITY_ID" = ?,
-"            "STATUS_ID" = ?,
-"            "CREATED" = ?,
-"            "REQUESTED" = ?,
-"            "ARRIVED" = ?,
-"      WHERE "REQUEST_ID"  = ?
-"
-"
-"
-"     Original:
-"     INSERT INTO "MESSAGES" ( "MSG_ID", "TO_PERSON_ID", 
-"     "FROM_PERSON_ID", "REQUEST_ID", "CREATED", "PRIORITY_ID", 
-"     "MSG_TYPE_ID", "STATUS_ID", "READ_WHEN", "TIMEOUT", 
-"     "MSG_TXT", "RESEND_COUNT" ) VALUES ( ?, ?, ?, 
-"     ?, ?, ?, ?, ?, ?, ?, ?, ? )
-"
-"
-"     Formatted:
-"     INSERT INTO "MESSAGES" ( "MSG_ID", "TO_PERSON_ID",
-"            "FROM_PERSON_ID", "REQUEST_ID", "CREATED",
-"            "PRIORITY_ID", "MSG_TYPE_ID", "STATUS_ID",
-"            "READ_WHEN", "TIMEOUT", "MSG_TXT", "RESEND_COUNT" )
-"     VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
-"
-"
-"   Functions:
-"   SQLUCreateColumnList( optional parameter )
-"
-"        Assumes either the current file, or any other open buffer, 
-"        has a CREATE TABLE statement in a format similar to this:
-"        CREATE TABLE customer (
-"        	id	INT DEFAULT AUTOINCREMENT,
-"        	last_modified TIMESTAMP NULL,
-"        	first_name     	VARCHAR(30) NOT NULL,
-"        	last_name	VARCHAR(60) NOT NULL,
-"        	balance	        NUMERIC(10,2),
-"        	PRIMARY KEY( id )
-"        );
-"        If you place the cursor on the word customer, then the 
-"        unnamed buffer (also displayed by an echo statement) will 
-"        contain:
-"        id, last_modified, first_name, last_name, balance
-"
-"        Optionally, it will replace the word with the above and place
-"        the word in the unnamed buffer.  Calling the function with
-"        a parameter enables this feature.
-"
-"        This also uses the g:sqlutil_cmd_terminator to determine when
-"        the create table statement ends if none of the following terms
-"        are found before the final );
-"               primary,reference,unique,check,foreign
-"        sqlutil_cmd defaults to ";"
-"
-"
-"   Functions:
-"   SQLUGetColumnDef( optional parameter )
-"   SQLUGetColumnDataType( expand("<cword>"), 1 )
-"
-"        Assumes either the current file, or any other open buffer, 
-"        has a CREATE TABLE statement in a format similar to this:
-"        CREATE TABLE customer (
-"        	id	INT DEFAULT AUTOINCREMENT,
-"        	last_modified TIMESTAMP NULL,
-"        	first_name     	VARCHAR(30) NOT NULL,
-"        	last_name	VARCHAR(60) NOT NULL,
-"        	balance	        NUMERIC(10,2),
-"        	PRIMARY KEY( id )
-"        );
-"        If you place the cursor on the word first_name, then the 
-"        column definition will be placed in the unnamed buffer (and also
-"        displayed by an echo statement).
-"        VARCHAR(30) NOT NULL        
-"
-"        If the command is called as SQLUGetColumnDef( expand("<cword>"), 1 )
-"        or using the default mapping \scdt, just the datatype (instead
-"        of the column definition) will be returned.  A separate command 
-"        SQLUGetColumnDataType has been created for this.
-"        VARCHAR(30) 
-"
-"
-"   Functions:
-"   SQLUCreateProcedure()
-"
-"        Assumes either the current file, or any other open buffer, 
-"        has a CREATE TABLE statement in a format similar to this:
-"        CREATE TABLE customer (
-"        	id	        INT DEFAULT AUTOINCREMENT,
-"        	last_modified   TIMESTAMP NULL,
-"        	first_name     	VARCHAR(30) NOT NULL,
-"        	last_name	VARCHAR(60) NOT NULL,
-"        	balance	        NUMERIC(10,2),
-"        	PRIMARY KEY( id )
-"        );
-"        By calling SQLUCreateProcedure while on the name of a table
-"        the unnamed buffer will contain the create procedure statement
-"        for insert, update, delete and select statements.
-"        Once pasted into the buffer, unneeded functionality can be 
-"        removed.
-"
-"
-"
-"   Commands:
-"   [range]SQLUFormatter ..list..    
-"                        : Reformats the SQL statements over the specified 
-"                          range.  Statement will lined up given the 
-"                          existing indent of the first word.
-"   SQLUCreateColumnList:  Creates a comma separated list of column names
-"                          for the table name under the cursor, assuming
-"                          the table definition exists in any open 
-"                          buffer.  The column list is placed in the unnamed
-"                          buffer.
-"                          This also uses the g:sqlutil_cmd_terminator
-"                          This routine can optionally take 2 parameters
-"                          SQLUCreateColumnList T1 
-"                              Creates a column list for T1
-"                          SQLUCreateColumnList T1 1
-"                              Creates a column list for T1 but only for
-"                              the primary keys for that table.
-"   SQLUGetColumnDef     : Displays the column definition of the column name
-"                          under the cursor.  It assumes the CREATE TABLE
-"                          statement is in an open buffer.
-"   SQLUGetColumnDataType
-"                        : Displays the column datatype of the column name
-"                          under the cursor.  It assumes the CREATE TABLE
-"                          statement is in an open buffer.
-"   SQLUCreateProcedure  : Creates a stored procedure to perform standard
-"                          operations against the table that the cursor
-"                          is currently under.
-"                          
-"
-"   
-"   Suggested Mappings:
-"       vmap <silent>sf        <Plug>SQLU_Formatter<CR>
-"       nmap <silent>scl       <Plug>SQLU_CreateColumnList<CR>
-"       nmap <silent>scd       <Plug>SQLU_GetColumnDef<CR>
-"       nmap <silent>scdt      <Plug>SQLU_GetColumnDataType<CR>
-"       nmap <silent>scp       <Plug>SQLU_CreateProcedure<CR>
-"
-"       mnemonic explanation
-"       s - sql
-"         f   - format
-"         cl  - column list
-"         cd  - column definition
-"         cdt - column datatype
-"         cp  - create procedure
-"
-"       To prevent the default mappings from being created, place the 
-"       following in your _vimrc:
-"           let g:sqlutil_load_default_maps = 0
-"
-"   Customization:
-"       By default this script assumes a command is terminated by a ;
-"       If you are using Microsoft SQL Server a command terminator 
-"       would be "go", or perhaps "\ngo".
-"       To permenantly override the terminator in your _vimrc file you can add
-"             let g:sqlutil_cmd_terminator = "\ngo"
-"
-"
-"       When building a column list from a script file (ie CREATE TABLE 
-"       statements), you can customize the script to detect when the 
-"       column list finishes by creating the following in your _vimrc:
-"             let g:sqlutil_col_list_terminators = 
-"                          \ 'primary,reference,unique,check,foreign'
-
-"       This can be necessary in the following example:
-"             CREATE TABLE customer (
-"                id         INT DEFAULT AUTOINCREMENT,
-"                first_name VARCHAR(30) NOT NULL,
-"                last_name  VARCHAR(60) NOT NULL,
-"                PRIMARY KEY( id )
-"             ); 
-"
-"
-"   TODO:
-"     1. Suggestions welcome
-"
-"
-"   History:
-"     1.3.3: Sep 05, 2003: NF: Added global variable 
-"                              sqlutil_col_list_terminators for 
-"                              customization.
-"     1.3.2: Aug 24, 2003: NF: Changed all functions to be prefixed by
-"                              SQLU_ for consistency.
-"                          BF: Fixed SQLU_GetColumnDataType and 
-"                              SQLU_GetColumnDef to handle tabs.
-"     1.3.1: Aug 21, 2003: BF: -@- could be left after incorrect formatting.
-"     1.3  : Mar 30, 2003: NF: Support the formatting of FUNCTIONS or
-"                              stored procedures used as derived tables.  This 
-"                              will nest the function calls on new lines and 
-"                              correctly split the paranthesis on new lines if 
-"                              the function call is longer than one line.  You 
-"                              would notice this mainly in the SELECT 
-"                              column list.
-"                          NF: Support the formatting of nested CASE
-"                              statements.
-"                          NF: Added the SQLU_GetColumnDataType command. 
-"                          NF: Improved primary key determination, it no 
-"                              longer requires the PRIMARY KEY statement to
-"                              be part of the CREATE TABLE statement, it can 
-"                              be part of an ALTER TABLE statement.
-"                          NF: Improved formatting of SQL keywords.  
-"                              INSERT INTO statement, the INTO will no longer
-"                              be split onto a new line.
-"                          NF: Now correctly format the various JOIN keywords:
-"                              NATURAL RIGHT OUTER JOIN will be placed one
-"                              online instead of just the JOIN keyword as
-"                              before.
-"                          BF: Did not properly handle the formatting of
-"                              nested open paranthesis in all cases.
-"                          BF: Using new technique to determine how to change
-"                              the textwidth to utilitize more screen space
-"                              when wrapping long lines.
-"     1.2  : Nov 30, 2002: NF: Create procedure uses shiftwidth for indent.
-"                          BF: Save/restore previous search.
-"     1.0  : Nov 13, 2002: NF: Initial version.
-" ---------------------------------------------------------------------
 
 " Prevent duplicate loading
 if exists("g:loaded_sqlutilities") || &cp
@@ -306,8 +20,27 @@ if exists("g:loaded_sqlutilities") || &cp
 endif
 let g:loaded_sqlutilities = 1
 
+if !exists('g:sqlutil_align_where')
+    let g:sqlutil_align_where = 1
+endif
+
+if !exists('g:sqlutil_align_comma')
+    let g:sqlutil_align_comma = 0
+endif
+
+if !exists('g:sqlutil_align_first_word')
+    let g:sqlutil_align_first_word = 1
+endif
+
 if !exists('g:sqlutil_cmd_terminator')
     let g:sqlutil_cmd_terminator = ';'
+endif
+
+if !exists('g:sqlutil_keyword_case')
+    " This controls whether keywords should be made
+    " upper or lower case.
+    " The default is to leave in current case.
+    let g:sqlutil_keyword_case = ''
 endif
 
 if !exists('g:sqlutil_col_list_terminators')
@@ -349,24 +82,26 @@ endif
 
 if(g:sqlutil_load_default_maps == 1)
     if !hasmapto('<Plug>SQLUFormatter')
+        nmap <unique> <Leader>sf <Plug>SQLUFormatter
         vmap <unique> <Leader>sf <Plug>SQLUFormatter
     endif 
     if !hasmapto('<Plug>SQLUCreateColumnList')
-        map <unique> <Leader>scl <Plug>SQLUCreateColumnList
+        nmap <unique> <Leader>scl <Plug>SQLUCreateColumnList
     endif 
     if !hasmapto('<Plug>SQLUGetColumnDef')
-        map <unique> <Leader>scd <Plug>SQLUGetColumnDef
+        nmap <unique> <Leader>scd <Plug>SQLUGetColumnDef
     endif 
     if !hasmapto('<Plug>SQLUGetColumnDataType')
-        map <unique> <Leader>scdt <Plug>SQLUGetColumnDataType
+        nmap <unique> <Leader>scdt <Plug>SQLUGetColumnDataType
     endif 
     if !hasmapto('<Plug>SQLUCreateProcedure')
-        map <unique> <Leader>scp <Plug>SQLUCreateProcedure
+        nmap <unique> <Leader>scp <Plug>SQLUCreateProcedure
     endif 
 endif 
 
 if exists("g:loaded_sqlutilities_global_maps")
     vunmap <unique> <script> <Plug>SQLUFormatter
+    nunmap <unique> <script> <Plug>SQLUFormatter
     nunmap <unique> <script> <Plug>SQLUCreateColumnList
     nunmap <unique> <script> <Plug>SQLUGetColumnDef
     nunmap <unique> <script> <Plug>SQLUGetColumnDataType
@@ -375,13 +110,14 @@ endif
 
 " Global Maps:
 vmap <unique> <script> <Plug>SQLUFormatter         :SQLUFormatter<CR>
+nmap <unique> <script> <Plug>SQLUFormatter         :SQLUFormatter<CR>
 nmap <unique> <script> <Plug>SQLUCreateColumnList  :SQLUCreateColumnList<CR>
 nmap <unique> <script> <Plug>SQLUGetColumnDef      :SQLUGetColumnDef<CR>
 nmap <unique> <script> <Plug>SQLUGetColumnDataType :SQLUGetColumnDataType<CR>
 nmap <unique> <script> <Plug>SQLUCreateProcedure   :SQLUCreateProcedure<CR>
 let g:loaded_sqlutilities_global_maps = 1
 
-if has("gui_running") && has("menu")
+if has("menu")
     vnoremenu <script> Plugin.SQLUtil.Format\ Statement :SQLUFormatter<CR>
     noremenu  <script> Plugin.SQLUtil.Format\ Statement :SQLUFormatter<CR>
     noremenu  <script> Plugin.SQLUtil.Create\ Procedure :SQLUCreateProcedure<CR>
@@ -538,6 +274,7 @@ function! s:SQLU_ReformatStatement()
     silent! 'y+1,'z-1s/\(\S\+\)\(\s\+\)/\1 /g
     " Go to the start of the block
     silent! 'y+1
+
     " Place an UPDATE on a newline, but not if it is preceeded by
     " the existing statement.  Example:
     "           INSERT INTO T1 (...)
@@ -551,7 +288,32 @@ function! s:SQLU_ReformatStatement()
     " as an INSERT statement.  We do not want to place INTO
     " on a newline if it is preceeded by INSERT
     let sql_into_keywords = '' . 
-                \ '\%(\%(\<insert\s\+\)\@<!into\)'
+                \ '\%(\%(\<\%(insert\|merge\)\s\+\)\@<!into\)'
+    " Normally you would add put an AND statement on a new
+    " line.  But in the cases where you are dealing with
+    " a BETWEEN '1963-1-1' AND '1965-3-31', we no not want
+    " to put the AND on a new line
+    " Do not put AND on a new line if preceeded by
+    "      between<space><some text not including space><space>AND
+    let sql_and_between_keywords = '' . 
+                \ '\%(\%(\<between\s\+[^ ]\+\s\+\)\@<!and\)'
+    " For SQL Remote (ASA), this is valid syntax
+    "           SUBSCRIBE BY
+    "       OLD SUBSCRIBE BY
+    "       NEW SUBSCRIBE BY
+    let sql_subscribe_keywords = '' . 
+                \ '\%(\%(\<\%(old\|new\)\s\+\)\?subscribe\)'
+    " Oracle CONNECT BY statement
+    let sql_connect_by_keywords = '' . 
+                \ 'connect\s\+by\s\+\w\+'
+    " Oracle MERGE INTO statement
+    "      MERGE INTO ...
+    "      WHEN MATCHED THEN ...
+    "      WHEN NOT MATCHED THEN ....
+    " Match on the WHEN clause (with zero width) if it is followed
+    " by [not] matched
+    let sql_merge_keywords = '' . 
+                \ '\%(merge\s\+into\)\|\%(when\(\s\+\%(not\s\+\)\?matched\)\@=\)'
     " FROM clause can be used in a DELETE statement as well 
     " as a SELECT statement.  We do not want to place FROM
     " on a newline if it is preceeded by DELETE
@@ -583,19 +345,38 @@ function! s:SQLU_ReformatStatement()
                 \ 'join\)\|' .
                 \ '\%(\%(\%(cross\)\?\s*\)\?join\)' .
                 \ '\)'
-    " Decho 'join operators: ' . sql_join_operator
     " force each keyword onto a newline
     let sql_keywords =  'create\|drop\|call\|select\|set\|values\|' .
                 \ sql_update_keywords . '\|' .
                 \ sql_into_keywords . '\|' .
+                \ sql_and_between_keywords . '\|' .
                 \ sql_from_keywords . '\|' .
                 \ sql_join_operator . '\|' .
-                \ 'on\|where\|and\|or\|order by\|group by\|' .
-                \ 'having\|for\|insert\|union\|subscribe\|' .
-                \ 'intersect\|except\|with\|window'
+                \ sql_subscribe_keywords . '\|' .
+                \ sql_connect_by_keywords . '\|' .
+                \ sql_merge_keywords . '\|' .
+                \ 'on\|where\|or\|order\s\+\%(\w\+\s\+\)\?by\|group\s\+by\|' .
+                \ 'having\|for\|insert\|using\|' .
+                \ 'intersect\|except\|window\|' .
+                \ '\%(union\%(\s\+all\)\?\)\|' .
+                \ 'start\s\+with\|' .
+                \ '\%(\%(\<start\s\+\)\@<!with\)'
+    " The user can specify whether to align the statements based on 
+    " the first word, or on the matching string.
+    "     let g:sqlutil_align_first_word = 0
+    "           select
+    "             from
+    "         union all
+    "     let g:sqlutil_align_first_word = 1
+    "           select
+    "             from
+    "            union all
     let cmd = "'y+1,'z-1".'s/\%(^\s*\)\@<!\zs\<\(' .
                 \ sql_keywords .
-                \ '\)\>/\r\1/gei'
+                \ '\)\>\s\+/' .
+                \ '\r\1' .
+                \ ( g:sqlutil_align_first_word==0 ? '-@-' : ' ' ) .
+                \ '/gei'
     " Decho cmd
     silent! exec cmd
 
@@ -607,18 +388,23 @@ function! s:SQLU_ReformatStatement()
     " and change which lines get formatted
     " 'y+1,'z-1g/^\s*$/d
 
-    " Make sure the first word on each line has the special -@- symbol after
-    " it which is used to align the rest of the SQL statement.  This command
-    " will replace the whitespace following the first word with the special
-    " symbol
-    silent! exec "'y+1,'z-1".'s/^\s*\<\w\+\>\zs\s*/-@-'
+    " If g:sqlutil_align_first_word == 0, then we need only add the -@-
+    " on the first word, else we need to do it to the first word
+    " on each line
+    silent! exec "'y+1," .  
+                \ ( g:sqlutil_align_first_word==0 ? "'y+1" : "'z-1" ) .  
+                \ 's/^\s*\<\w\+\>\zs\s*/-@-'
 
     " Ensure CASE statements also start on new lines
     " CASE statements can also be nested, but we want these to align
     " with column lists, not keywords, so the -@- is placed BEFORE
     " the CASE keywords, not after
+    "
+    " The CASE statement and the Oracle MERGE statement are very similar.
+    " I have changed the WHEN clause to check to see if it is followed
+    " by [NOT] MATCHED, if so, do not match the WHEN
     let sql_case_keywords = '\(\<end\s\+\)\@<!case'.
-                \ '\|when\|else\|end\( case\)\?'
+                \ '\|\<when\>\(\%(-@-\)\?\s*\%(not\s\+\)\?matched\)\@!\|else\|end\( case\)\?'
     " echom 'case: '.sql_case_keywords
     " The case keywords must not be proceeded by a -@-
     silent! exec "'y+1,'z-1".'s/'.
@@ -637,6 +423,37 @@ function! s:SQLU_ReformatStatement()
     " -@- to align on this later
     " silent! 'y+1,'z-1s/^\(\s*\)\([a-zA-Z0-9_]*\) /\1\2-@-
 
+    " if g:sqlutil_keyword_case == 'U'
+    "     " If the user has specified, convert keywords to UPPER CASE
+    "     let cmd = "'y+1,'z-1".'s/\<\(' .
+    "                 \ sql_keywords .
+    "                 \ '\|' .
+    "                 \ sql_case_keywords .
+    "                 \ '\)\>/\U\1/gei'
+    "     silent! exec cmd
+    " elseif g:sqlutil_keyword_case == 'L'
+    "     " If the user has specified, convert keywords to lower case
+    "     let cmd = "'y+1,'z-1".'s/\<\(' .
+    "                 \ sql_keywords .
+    "                 \ '\|' .
+    "                 \ sql_case_keywords .
+    "                 \ '\)\>/\L\1/gei'
+    "     silent! exec cmd
+    " endif
+
+    let cmd = "'y+1,'z-1".'s/\<\(' .
+                \ sql_keywords .
+                \ '\|' .
+                \ sql_case_keywords .
+                \ '\)\>/' .
+                \ g:sqlutil_keyword_case .
+                \ '\1/gei'
+    silent! exec cmd
+
+    if g:sqlutil_align_comma == 1 
+	call s:SQLU_WrapAtCommas()
+    endif
+
     call s:SQLU_WrapFunctionCalls()
 
     let ret = s:SQLU_SplitUnbalParan()
@@ -654,13 +471,19 @@ function! s:SQLU_ReformatStatement()
 
     " Now align the operators 
     " and the operators are CENTER justified
-    " AlignCtrl default
-    " AlignCtrl g [!><=]
-    " AlignCtrl Wp1P1l
+    if g:sqlutil_align_where == 1
+        AlignCtrl default
+        AlignCtrl g [!<>=]
+        AlignCtrl Wp1P1l
 
-    " Change this to only attempt to align the last WHERE clause
-    " and not the entire SQL statement
-    " silent! 'y+1,'z-1Align [!><=]=\=
+        " Change this to only attempt to align the last WHERE clause
+        " and not the entire SQL statement
+        " Valid operators are: 
+        "      =, =, >, <, >=, <=, !=, !<, !>, <> 
+        " The align below was extended to allow the last character
+        " to be either =,<,>
+        silent! 'y+1,'z-1Align [!<>=]\(<\|>\|=\)\=
+    endif
 
     " Reset back to defaults
     AlignCtrl default
@@ -724,7 +547,9 @@ function! s:SQLU_IndentNestedBlocks()
 
     let ret = linenum
 
+    "
     " Indent nested CASE blocks
+    "
     let linenum = line("'y+1")
     " Search for the beginning of a CASE statement
     let begin_case = '\<\(\<end\s\+\)\@<!case\>'
@@ -749,6 +574,45 @@ function! s:SQLU_IndentNestedBlocks()
         endif
         silent! exe 'norm! '.end_of_case."G\<bar>0\<bar>"
     endwhile
+
+    "
+    " Indent Oracle nested MERGE blocks
+    "
+    let linenum = line("'y+1")
+    " Search for the beginning of a CASE statement
+    let begin_merge = '\<merge\s\+into\>'
+
+    silent! exe 'norm! '.linenum."G\<bar>0\<bar>"
+
+    if( search( begin_merge, 'W' ) > 0 )
+        let curline = line(".")
+        if( (curline < line("'y+1"))  || (curline > line("'z-1" )) )
+            " echom 'No case statements, leaving loop'
+            silent! exe 'norm! '.line("'y+1")."G\<bar>0\<bar>"
+        else
+            " echom 'begin CASE found at: '.curline
+            let curline = curline + 1
+
+            while 1==1
+                " Find the matching when statement
+                " let match_merge = searchpair('\<merge\s\+into\>', 
+                let match_merge = searchpair('\<merge\>', '',
+                            \ '\<\%(when\s\+\%(not\s\+\)\?matched\)', 
+                            \ 'W', '' )
+                if( (match_merge < curline) || (match_merge > line("'z-1")) )
+                    silent! exec curline . "," . line("'z-1") . ">>"
+                    break
+                else
+                    if match_merge > (curline+1)
+                        let savePos = 'normal! '.line(".").'G'.col(".")."\<bar>"
+                        silent! exec curline . "," . (match_merge-1) . ">>"
+                        silent! exec savePos
+                    endif
+                    let curline = match_merge + 1
+                endif
+            endwhile
+        endif
+    endif
 
     let &textwidth = org_textwidth
     return ret
@@ -811,7 +675,7 @@ function! s:SQLU_WrapFunctionCalls()
     endif
 
     let sql_keywords = 'select\|set\|\(insert\(-@-\)\?\)into\|from\|values'.
-                \ '\|order\|group\|having\|return'
+                \ '\|order\|group\|having\|return\|with'
 
     " Useful in the debugger
     " echo linenum.' '.func_call.' '.virtcol(".").' 
@@ -862,10 +726,11 @@ function! s:SQLU_WrapFunctionCalls()
             endif
             let end_paran = searchpair( '(', '', ')', '' )
             if end_paran < linenum || end_paran > linenum
-                call s:SQLU_WarningMsg(
-                            \ 'SQLU_WrapFunctionCalls - ' . 
-                            \ 'should have found a matching )'
-                            \ )
+                " call s:SQLU_WarningMsg(
+                "             \ 'SQLU_WrapFunctionCalls - ' . 
+                "             \ 'should have found a matching ) for :' .
+                "             \ getline(linenum)
+                "             \ )
                 let linenum = linenum + 1
                 break
             endif
@@ -886,6 +751,7 @@ function! s:SQLU_WrapFunctionCalls()
                             \ '^\s*' .
                             \ '\(' .
                             \ sql_keywords .
+                            \ '\|,' .
                             \ '\)' .
                             \ '\(-@-\)\?' .
                             \ '\s*' .
@@ -928,6 +794,85 @@ function! s:SQLU_WrapFunctionCalls()
     return linenum
 endfunction
 
+" For certain keyword lines (SELECT, SET, INTO, FROM, VALUES)
+" put each comma on a new line and align it with the keyword 
+"     SELECT c1
+"          , c2
+"          , c3
+function! s:SQLU_WrapAtCommas()
+    let linenum = line("'y+1")
+
+    let sql_keywords = 'select\|set\|into\|from\|values'
+
+    " call Decho(" Before column splitter 'y+1=".line("'<").
+    " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
+    while linenum <= line("'z-1")
+        let line = getline(linenum)
+        " if line =~? '^\s*\('.sql_keywords.'\)'
+        if line =~? '\w'
+            if line =~? '^\s*\<\('.sql_keywords.'\)\>'
+                silent! exec linenum 
+		" silent! exec linenum . ',' . linenum . 's/\w\+\zs\s\+/-@-'
+
+                " Mark the start of the wide line
+                silent! exec "normal mb"
+                " echom "line b - ".getline("'b")
+                " Mark the next line
+                silent! exec "normal jmek"
+
+		let index = match(getline(linenum), '[,(]')
+		while index > -1
+		    " Go to character
+		    silent! exe 'norm! '.linenum."G\<bar>".
+				\ index.(index>0 ? 'l' : '' )
+
+		    if getline(linenum)[col(".")-1] == '('
+			if searchpair( '(', '', ')', '' ) > 0
+			    if line(".") != linenum
+				break
+			    else
+				let index = col(".")
+			    endif
+			endif
+		    else
+			" Given the current cursor position, replace
+			" the , and any following whitespace
+			" with a newline and the special -@- character
+			" for Align
+			silent! exec linenum . ',' . linenum . 
+				    \ 's/\%' . (index + 1) . 'c,\s*' .
+				    \ '/\r,-@-'
+			let linenum = linenum + 1
+			" Find the index of the first non-white space
+			" which should be the , we just put on the 
+			" newline
+			let index = match(getline(linenum), '\S')
+			let index = index + 1
+		    endif
+
+		    " then continue on for the remainder of the line
+		    " looking for the next , or (
+		    "
+		    " Must figure out what index value to start from
+		    let index = match( getline(linenum), '[,(]', index )
+		endwhile
+
+                " AlignCtrl Ip0P0rl:
+                " silent! 'b,'e-Align -@-
+                " silent! 'b,'e-s/-@-/ /
+                " AlignCtrl default
+
+                " Go to the end of the new lines
+                silent! exec "'e-" 
+            endif
+        endif
+
+        let linenum = linenum + 1
+    endwhile
+
+    return linenum
+endfunction
+
 " For certain keyword lines (SELECT, ORDER BY, GROUP BY, ...)
 " Ensure the lines fit in the textwidth (or default 80), wrap
 " the lines where necessary and left justify the column names
@@ -944,7 +889,7 @@ function! s:SQLU_WrapLongLines()
     endif
 
     let sql_keywords = 'select\|set\|into\|from\|values'.
-                \ '\|order\|group\|having\|call'
+                \ '\|order\|group\|having\|call\|with'
 
     " call Decho(" Before column splitter 'y+1=".line("'<").
     " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
@@ -998,7 +943,11 @@ function! s:SQLU_WrapLongLines()
                 else
                     " Place the special marker that the first non-whitespace
                     " characeter
-                    silent! exec linenum . ',' . linenum . 's/\S/-@-&'
+                    if g:sqlutil_align_comma == 1 
+                        silent! exec linenum . ',' . linenum . 's/^\s*\zs,\s*/,  -@-'
+                    else
+                        silent! exec linenum . ',' . linenum . 's/\S/-@-&'
+                    endif
                 endif
 
                 silent! exec linenum
@@ -1022,14 +971,15 @@ function! s:SQLU_WrapLongLines()
 
                 " Reformat the commas
                 " silent! 'b,'e-s/\s*,/,/ge
-                silent! exec "'b,".end_line_nbr.'s/\s*,/,/ge'
+                " silent! exec "'b,".end_line_nbr.'s/\s*,/,/ge'
                 " Add a space after the comma
                 " silent! 'b,'e-s/,\(\w\)/, \1/ge
                 silent! exec "'b,".end_line_nbr.'s/,\(\w\)/, \1/ge'
 
                 " Append the special marker to the beginning of the line
                 " for Align.vim
-                silent! exec "'b+," .end_line_nbr. 's/\s*\(.*\)/-@-\1'
+                " silent! exec "'b+," .end_line_nbr. 's/\s*\(.*\)/-@-\1'
+                silent! exec "'b+," .end_line_nbr. 's/^\s*/-@-'
                 " silent! exec "'b+,'e-" . 's/\s*\(.*\)/-@-\1'
                 AlignCtrl Ip0P0rl:
                 " silent! 'b,'e-Align -@-
@@ -1038,7 +988,7 @@ function! s:SQLU_WrapLongLines()
                 if line =~? '^\s*\('.sql_keywords.'\)'
                     silent! exec "'b,".end_line_nbr.'s/-@-/ /ge'
                 else
-                    silent! exec "'b,".end_line_nbr.'s/-@-//ge'
+                    silent! exec "'b,".end_line_nbr.'s/-@-/'.(g:sqlutil_align_comma == 1 ? ' ' : '' ).'/ge'
                 endif
                 AlignCtrl default
 
@@ -1879,3 +1829,5 @@ function! s:SQLU_WarningMsg(msg) "{{{
     echomsg a:msg
     echohl None
 endfunction "}}}
+
+" vim: ts=4

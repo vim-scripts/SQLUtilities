@@ -1,0 +1,598 @@
+*SQLUtilities.txt*      For Vim version 6.0. 
+
+Author:	        David Fishburn                             February 20, 2004
+
+SQLUtilities:   Variety of tools for working with SQL
+
+For instructions on installing this file, type
+	:help add-local-help
+|add-local-help| inside Vim.
+
+==============================================================================
+1. Contents                                      *sqlutil* *sqlutil-contents*
+
+    1. Contents...............................: |sqlutil-contents|
+    2. Commands...............................: |sqlutil-commands|
+       2.1 SQLUFormatter......................: |sqlutil-formatter|
+           2.1.1 Formatting Examples..........: |sqlutil-examples|
+           2.1.2 Formatting Options...........: |sqlutil-format-options|
+                 2.1.2.1 Align Where Clause...: |sqlutil-align-where|
+                 2.1.2.2 Align Comma..........: |sqlutil-align-comma|
+                 2.1.2.3 Align First Word.....: |sqlutil-align-first-word|
+                 2.1.2.4 Change Keyword Case..: |sqlutil-change_keyword-case|
+       2.2 SQLUCreateColumnList...............: |sqlutil-column-list|
+       2.3 SQLUGetColumnDef...................: |sqlutil-column-definition|
+           SQLUGetColumnDataType..............: |sqlutil-column-datatype|
+       2.4 SQLUCreateProcedure................: |sqlutil-procedure|
+    3. Suggested Mappings.....................: |sqlutil-mappings|
+    4. Customization..........................: |sqlutil-customization|
+    5. History................................: |sqlutil-history|
+    6. Dependencies...........................: |sqlutil-dependencies|
+    7. Complementary Plugins..................: |sqlutil-complementary-plugins|
+    8. TODO...................................: |sqlutil-todo|
+
+==============================================================================
+2. Commands                                      *sqlutil-commands*
+
+2.1 SQLUFormatter                                *sqlutil-formatter*
+
+  [range]SQLUFormatter(..list..)                
+
+       - Formats one statement at a time, this is not meant to be
+         an indenter for SQL files.
+       - Reformats the SQL statements over the specified range.  
+       - Statement will lined up given the existing indent of the first word.
+       - Formats SQL statements into a easily readable form.
+       - Breaks keywords onto new lines.
+       - Forces column lists to be split over as many lines as
+         necessary to fit the current textwidth of the buffer,
+         so that lines do not wrap.
+       - If parentheses are unbalanced (ie a subselect) it will
+         indent everything within the unbalanced parenthesis.
+       - Works for SELECT, INSERT, UPDATE, DELETE statements.
+
+2.1.1 Formatting Examples:                       *sqlutil-examples*
+
+    Original: >
+    SELECT m.MSG_ID, m.PRIORITY_ID, CUST.CUST_NBR, CUST.CUST_NM, 
+    CUST.CUST_LEGAL_NM, CUST.STORE_ADDR_1, CUST.STORE_ADDR_2, 
+    CUST.CROSS_STREET, XMLELEMENT( 'Alerts', XMLELEMENT( 'Alert_alert_id', 
+    alert_id ), XMLELEMENT( 'Alert_agent_id', agent_id ), XMLELEMENT( 
+    'Alert_alert_type_id', alert_type_desc), XMLELEMENT( 
+    'Alert_alert_date', alert_date), XMLELEMENT( 
+    'Alert_url_reference', url_reference), XMLELEMENT( 
+    'Alert_read_status', read_status )) CUST.STORE_CITY, 
+    CUST.STORE_ST, CUST.POST_CODE, CUST.STORE_MGR_NM, FROM MESSAGES m JOIN 
+    PRIORITY_CD P WHERE m.to_person_id = ?  AND p.NAME = 'PRI_EMERGENCY' AND 
+    p.JOB = 'Plumber' AND m.status_id < ( SELECT s.STATUS_ID FROM 
+    MSG_STATUS_CD s WHERE s.NAME = 'MSG_READ') ORDER BY m.msg_id desc
+<    
+
+  Formatted: >
+    SELECT m.MSG_ID, m.PRIORITY_ID, CUST.CUST_NBR, CUST.CUST_NM,
+           CUST.CUST_LEGAL_NM, CUST.STORE_ADDR_1, CUST.STORE_ADDR_2,
+           CUST.CROSS_STREET,
+           XMLELEMENT(
+               'Alerts', XMLELEMENT( 'Alert_alert_id', alert_id ),
+               XMLELEMENT( 'Alert_agent_id', agent_id ),
+               XMLELEMENT( 'Alert_alert_type_id', alert_type_desc),
+               XMLELEMENT( 'Alert_alert_date', alert_date),
+               XMLELEMENT(
+                   'Alert_url_reference', url_reference
+                ), XMLELEMENT( 'Alert_read_status', read_status )
+           ) CUST.STORE_CITY, CUST.STORE_ST, CUST.POST_CODE, 
+           CUST.STORE_MGR_NM
+      FROM MESSAGES m
+      JOIN PRIORITY_CD P
+     WHERE m.to_person_id = ?
+       AND p.NAME = 'PRI_EMERGENCY'
+       AND p.JOB = 'Plumber'
+       AND m.status_id < (
+            SELECT s.STATUS_ID
+              FROM MSG_STATUS_CD s
+             WHERE s.NAME = 'MSG_READ'
+           )
+     ORDER BY m.msg_id desc
+<    
+    
+
+  Original: >
+    UPDATE "SERVICE_REQUEST" SET "BUILDING_ID" = ?, "UNIT_ID" = ?, 
+    "REASON_ID" = ?, "PERSON_ID" = ?, "PRIORITY_ID" = ?, "STATUS_ID" = ?, 
+    "CREATED" = ?, "REQUESTED" = ?, "ARRIVED" = ?  WHERE "REQUEST_ID" = ?
+<
+
+  Formatted: >
+    UPDATE "SERVICE_REQUEST"
+       SET "BUILDING_ID" = ?,
+           "UNIT_ID" = ?,
+           "REASON_ID" = ?,
+           "PERSON_ID" = ?,
+           "PRIORITY_ID" = ?,
+           "STATUS_ID" = ?,
+           "CREATED" = ?,
+           "REQUESTED" = ?,
+           "ARRIVED" = ?,
+     WHERE "REQUEST_ID"  = ?
+<
+
+
+  Original: >
+    INSERT INTO "MESSAGES" ( "MSG_ID", "TO_PERSON_ID", 
+    "FROM_PERSON_ID", "REQUEST_ID", "CREATED", "PRIORITY_ID", 
+    "MSG_TYPE_ID", "STATUS_ID", "READ_WHEN", "TIMEOUT", 
+    "MSG_TXT", "RESEND_COUNT" ) VALUES ( ?, ?, ?, 
+    ?, ?, ?, ?, ?, ?, ?, ?, ? )
+<
+
+  Formatted: >
+    INSERT INTO "MESSAGES" ( "MSG_ID", "TO_PERSON_ID",
+           "FROM_PERSON_ID", "REQUEST_ID", "CREATED",
+           "PRIORITY_ID", "MSG_TYPE_ID", "STATUS_ID",
+           "READ_WHEN", "TIMEOUT", "MSG_TXT", "RESEND_COUNT" )
+    VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
+<
+
+
+2.1.2 Formatting Options                         *sqlutil-format-options*
+
+  There are several options which can control how the SQL statements are
+  formatted.
+  
+2.1.2.1 Align Where Clause                       *sqlutil-align-where*
+
+  sqlutil_align_where is used to align operators. Valid operators are: 
+       =, =, >, <, >=, <=, !=, !<, !>, <> 
+  This option is "ON" by default.  When formatting SQL statements with many 
+  nested statements, the results can shifted too much.  You can disable it,
+  format the statement and enable it again afterwards: >
+       let g:sqlutil_align_where = 1
+
+       SELECT CategoryID, CategoryName, CategorySystemName, (
+               SELECT B.CATEGORYID CATID
+                 FROM CATEGORY
+                WHERE B.CATEGORYID      =  intCategoryID
+                  AND B.REVIDDFD        =  intRevID
+                  AND B.REVID           >  intRevID
+                  AND B.REVIDDFDSDSF    <  intRevID
+                  AND B.REVIDDFD        >= intRevID
+                  AND B.REVIDD          <= intRevID
+                  AND B.REVIDLLKKKK     != intRevID
+                  AND B.REVIDK          !< intRevID
+                  AND B.REVIDDD         !> intRevID
+                  AND B.REV             <> intRevID
+                  AND B.DEL             =  0
+                UNION ALL
+               SELECT B.CATEGORYID
+                 FROM CATEGORYHDR B
+                WHERE intCategoryID IS NULL
+              ) tmp
+        WHERE TMP.CATID         =  PCat.CategoryID
+          AND PCat.RevID        =  intRevID
+          AND P.RevID           =  PCat.RevID
+          AND CATHDR.CATEGORYID =  PCAT.CATEGORYID
+<
+
+  To disable: >
+       let g:sqlutil_align_where = 0
+
+       SELECT CategoryID, CategoryName, CategorySystemName, (
+               SELECT B.CATEGORYID CATID
+                 FROM CATEGORY
+                WHERE B.CATEGORYID = intCategoryID
+                  AND B.REVIDDFD = intRevID
+                  AND B.REVID > intRevID
+                  AND B.REVIDDFDSDSF < intRevID
+                  AND B.REVIDDFD >= intRevID
+                  AND B.REVIDD <= intRevID
+                  AND B.REVIDLLKKKK != intRevID
+                  AND B.REVIDK !< intRevID
+                  AND B.REVIDDD !> intRevID
+                  AND B.REV <> intRevID
+                  AND B.DEL = 0
+                UNION ALL
+               SELECT B.CATEGORYID
+                 FROM CATEGORYHDR B
+                WHERE intCategoryID IS NULL
+              ) tmp
+        WHERE TMP.CATID = PCat.CategoryID
+          AND PCat.RevID = intRevID
+          AND P.RevID = PCat.RevID
+          AND CATHDR.CATEGORYID = PCAT.CATEGORYID
+<
+
+2.1.2.2 Align Comma                              *sqlutil-align-comma*
+
+  sqlutil_align_comma is used to force each column in a column list to be
+  placed on a new line.  The SET statement in a UPDATE clause already 
+  does this by default.
+  This option is "OFF" by default. >
+       let g:sqlutil_align_comma = 0
+
+       SELECT PK_BranchID, PK_ItemID, FK_VaultID, FK_ItemType,
+              ItemBarCode, FK_CommodityType, FK_CommodityTypeCode,
+              ItemQuantity, ItemSealNumber, FK_ItemDenominationType,
+              ItemSaidToContain, ItemNotes, FK_PackageDeliveryLocationID,
+              FK_PackagePickupLocationID, FK_ItemParentID
+         FROM some_table
+<
+
+  To enable: >
+       let g:sqlutil_align_comma = 1
+
+       SELECT PK_BranchID
+            , PK_ItemID
+            , FK_VaultID
+            , FK_ItemType
+            , ItemBarCode
+            , FK_CommodityType
+            , FK_CommodityTypeCode
+            , ItemQuantity
+            , ItemSealNumber
+            , FK_ItemDenominationType
+            , ItemSaidToContain
+            , ItemNotes
+            , FK_PackageDeliveryLocationID
+            , FK_PackagePickupLocationID
+            , FK_ItemParentID
+         FROM some_table
+<
+
+2.1.2.3 Align First Word                         *sqlutil-align-first-word*
+
+  sqlutil_align_first_word is used to control how the keywords are 
+  aligned when formatting.  The default behaviour is the keywords
+  are RIGHT justified on the first word of the phrase.  So for an
+  ORDER BY statement the keywords are aligned between the ORDER and the 
+  BY words.  
+  This option is "ON" by default. >
+       let g:sqlutil_align_first_word = 1
+
+       SELECT CategoryID
+            , CategoryName
+            , CategorySystemName
+            , (
+               SELECT B.CATEGORYID CATID
+                 FROM CATEGORY B
+                START WITH B.CATEGORYID     = intCategoryID
+                  AND B.REVID               = intRevID
+                  AND B.DEL                 = 0
+              CONNECT BY PRIOR B.CATEGORYID = B.PARENTCATEGORYID
+                  AND B.REVID               = intRevID
+                  AND B.DEL                 = 0
+                UNION ALL
+               SELECT B.CATEGORYID
+                 FROM CATEGORYHDR B
+                WHERE intCategoryID IS NULL
+              ) tmp
+        WHERE TMP.CATID             = PCat.CategoryID
+          AND PCat.RevID            = intRevID
+          AND P.RevID               = PCat.RevID
+          AND CATHDR.CATEGORYID     = PCAT.CATEGORYID
+        ORDER BY CategoryID
+<
+
+  To disable: >
+       let g:sqlutil_align_first_word = 0
+
+          SELECT CategoryID
+               , CategoryName
+               , CategorySystemName
+               , (
+                  SELECT B.CATEGORYID CATID
+                    FROM CATEGORY B
+              START WITH B.CATEGORYID      = intCategoryID
+                     AND B.REVID           = intRevID
+                     AND B.DEL             = 0
+        CONNECT BY PRIOR B.CATEGORYID      = B.PARENTCATEGORYID
+                     AND B.REVID           = intRevID
+                     AND B.DEL             = 0
+               UNION ALL 
+                  SELECT B.CATEGORYID
+                    FROM CATEGORYHDR B
+                   WHERE intCategoryID IS NULL
+                 ) tmp
+           WHERE TMP.CATID         = PCat.CategoryID
+             AND PCat.RevID        = intRevID
+             AND P.RevID           = PCat.RevID
+             AND CATHDR.CATEGORYID = PCAT.CATEGORYID
+        ORDER BY CategoryID
+<
+
+2.1.2.4 Change Keyword Case                      *sqlutil-change_keyword-case*
+
+  sqlutil_keyword_case is used to control if the case of the keywords
+  should be changed when formatting.  This option uses Vim's standard 
+  regular expression syntax |/\l| to control its' behaviour.  
+  The default is to leave the cAsE aS Is.  Assume the first query
+  below is our original statement: >
+       let g:sqlutil_keyword_case = ''
+
+       select CategoryID, CategoryName, CategorySystemName
+        WHERE TMP.CATID         = PCat.CategoryID
+          and PCat.RevID        = intRevID
+          aND P.RevID           = PCat.RevID
+          and CATHDR.CATEGORYID = PCAT.CATEGORYID
+          
+
+       let g:sqlutil_keyword_case = '\U'
+
+       SELECT CategoryID, CategoryName, CategorySystemName
+        WHERE TMP.CATID         =  PCat.CategoryID
+          AND PCat.RevID        =  intRevID
+          AND P.RevID           =  PCat.RevID
+          AND CATHDR.CATEGORYID =  PCAT.CATEGORYID
+
+          
+       let g:sqlutil_keyword_case = '\L'
+
+       select CategoryID, CategoryName, CategorySystemName
+        where TMP.CATID = PCat.CategoryID
+          and PCat.RevID = intRevID
+          and P.RevID = PCat.RevID
+          and CATHDR.CATEGORYID = PCAT.CATEGORYID
+
+          
+       let g:sqlutil_keyword_case = '\u'
+
+       Select CategoryID, CategoryName, CategorySystemName
+        WHERE TMP.CATID = PCat.CategoryID
+          And PCat.RevID = intRevID
+          AND P.RevID = PCat.RevID
+          And CATHDR.CATEGORYID = PCAT.CATEGORYID
+
+          
+       let g:sqlutil_keyword_case = '\l'
+
+       select CategoryID, CategoryName, CategorySystemName
+        wHERE TMP.CATID = PCat.CategoryID
+          and PCat.RevID = intRevID
+          aND P.RevID = PCat.RevID
+          and CATHDR.CATEGORYID = PCAT.CATEGORYID
+
+
+2.2 SQLUCreateColumnList                         *sqlutil-column-list*
+
+  SQLUCreateColumnList( optional parameter )
+
+  Creates a comma separated list of column names for the table name under the
+  cursor, assuming the table definition exists in any open buffer.  The column
+  list is placed in the unnamed buffer.
+
+  To determine where a statement ends the g:sqlutil_cmd_terminator is used.
+  This is true for the CREATE TABLE statement, and the ALTER TABLE 
+  statements.
+
+  This function optionally takes 2 parameters: >
+       SQLUCreateColumnList T1 
+<            Creates a column list for T1
+>
+       SQLUCreateColumnList T1 1
+<            Creates a column list for T1 but only for the primary keys for
+             that table.
+
+   Assumes either the current file, or any other open buffer, has a CREATE
+   TABLE statement in a format similar to this: >
+
+       CREATE TABLE customer (
+            id	           INT DEFAULT AUTOINCREMENT,
+            last_modified  TIMESTAMP NULL,
+            first_name     VARCHAR(30) NOT NULL,
+            last_name	   VARCHAR(60) NOT NULL,
+            balance	        NUMERIC(10,2),
+            PRIMARY KEY( id )
+       );
+<       
+  If you place the cursor on the word customer, then the unnamed buffer (also
+  displayed by an echo statement) will contain: >
+       id, last_modified, first_name, last_name, balance
+<
+  This also uses the g:sqlutil_cmd_terminator to determine when the create
+  table statement ends if none of the following terms (these are the defaults)
+  are found before the final ");". >
+       primary,reference,unique,check,foreign
+< sqlutil_cmd_terminator defaults to ";"
+
+  When building a column list from a script file (ie CREATE TABLE statements),
+  you can customize the script to detect when the column list finishes by
+  creating the following in your |vimrc|: >
+       let g:sqlutil_col_list_terminators = 
+                         \ 'primary,reference,unique,check,foreign'
+<
+  This is necessary to determine where the list of columns finishes and 
+  when the list of table keywords begin in the following examples: >
+       CREATE TABLE customer (
+          id           INT DEFAULT AUTOINCREMENT,
+          first_name   VARCHAR(30) NOT NULL,
+          last_name    VARCHAR(60) NOT NULL,
+          PRIMARY KEY( id )
+       ); 
+
+       CREATE TABLE contact (
+          id           INT DEFAULT AUTOINCREMENT,
+          cust_        INT NOT NULL,
+          first_name   VARCHAR(30) NOT NULL,
+          last_name    VARCHAR(60) NOT NULL,
+          CHECK( id > 0 )
+          FOREIGN KEY fk_customer ( cust_id ) 
+          REFERENCES customer(id)
+          PRIMARY KEY( id )
+       ); 
+<
+
+2.3 SQLUGetColumnDef                             *sqlutil-column-definition*
+    SQLUGetColumnDataType                        *sqlutil-column-datatype*
+
+  SQLUGetColumnDef( optional parameter )           
+  SQLUGetColumnDataType( expand("<cword>"), 1 )
+
+  Assumes either the current file, or any other open buffer, has a CREATE TABLE
+  statement in a format similar to this: >
+
+       CREATE TABLE customer (
+           id	           INT DEFAULT AUTOINCREMENT,
+           last_modified   TIMESTAMP NULL,
+           first_name      VARCHAR(30) NOT NULL,
+           last_name	   VARCHAR(60) NOT NULL,
+           balance	       NUMERIC(10,2),
+           PRIMARY KEY( id )
+       );
+<
+  |hidden| must be enabled for this plugin to cycle through other open 
+  buffers.  If you place the cursor on the word first_name, then the column
+  definition will be placed in the unnamed buffer (and also displayed by an
+  echo statement). >
+       VARCHAR(30) NOT NULL        
+<
+  If the command is called as SQLUGetColumnDef( expand("<cword>"), 1 ) or using
+  the default mapping <Leader>scdt, just the datatype (instead of the column
+  definition) will be returned.  A separate command SQLUGetColumnDataType has
+  been created for this. >
+       VARCHAR(30) 
+<
+
+
+2.4 SQLUCreateProcedure()                        *sqlutil-procedure*
+
+  SQLUCreateProcedure()
+
+  Creates a stored procedure that performs standard operations (SELECT, 
+  INSERT, UPDATE, DELETE) against the table that the cursor is currently under.
+  Once the procedure has been pasted into the buffer, the unwanted statements
+  can be removed.
+
+  Assumes either the current file, or any other open buffer, has a CREATE TABLE
+  statement in a format similar to this: >
+
+       CREATE TABLE customer (
+           id	           INT DEFAULT AUTOINCREMENT,
+           last_modified   TIMESTAMP NULL,
+           first_name      VARCHAR(30) NOT NULL,
+           last_name	   VARCHAR(60) NOT NULL,
+           balance	       NUMERIC(10,2),
+           PRIMARY KEY( id )
+       );
+<       
+  |hidden| must be enabled for this plugin to cycle through other open 
+  buffers.  
+
+==============================================================================
+3. Suggested Mappings:                           *sqlutil-mappings*
+
+  vmap <leader>sf        <Plug>SQLU_Formatter<CR>
+  nmap <leader>scl       <Plug>SQLU_CreateColumnList<CR>
+  nmap <leader>scd       <Plug>SQLU_GetColumnDef<CR>
+  nmap <leader>scdt      <Plug>SQLU_GetColumnDataType<CR>
+  nmap <leader>scp       <Plug>SQLU_CreateProcedure<CR>
+
+  mnemonic explanation
+     s - sql
+         f   - format
+         cl  - column list
+         cd  - column definition
+         cdt - column datatype
+         cp  - create procedure
+
+  To prevent the default mappings from being created, place the following in
+  your |vimrc|:
+          let g:sqlutil_load_default_maps = 0
+
+==============================================================================
+4. Customization                                 *sqlutil-customization*
+
+  By default this script assumes a command is terminated by a ; If you are
+  using Microsoft SQL Server a command terminator would be "go", or perhaps
+  "\ngo".
+
+  To permanently override the terminator in your |vimrc| file you can add: >
+            let g:sqlutil_cmd_terminator = "\ngo"
+<
+==============================================================================
+5. History                                       *sqlutil-history*
+
+  1.3.5: Mar 05, 2004: 
+         NF: Added global variable sqlutil_align_where, sqlutil_align_comma,
+             sqlutil_align_first_word for customization of alignment rules.
+
+  1.3.3: Sep 05, 2003: 
+         NF: Added global variable sqlutil_col_list_terminators for
+             customization.
+
+  1.3.2: Aug 24, 2003: 
+         NF: Changed all functions to be prefixed by SQLU_ for consistency.
+         BF: Fixed SQLU_GetColumnDataType and SQLU_GetColumnDef to handle tabs.
+         
+  1.3.1: Aug 21, 2003: 
+         BF: -@- could be left after incorrect formatting.
+
+  1.3.0: Mar 30, 2003: 
+         NF: Support the formatting of FUNCTIONS or stored procedures used as
+             derived tables.  This will nest the function calls on new lines
+             and correctly split the parenthesis on new lines if the function
+             call is longer than one line.  You would notice this mainly in the
+             SELECT column list.
+         NF: Support the formatting of nested CASE statements.
+         NF: Added the SQLU_GetColumnDataType command. 
+         NF: Improved primary key determination, it no longer requires the
+             PRIMARY KEY statement to be part of the CREATE TABLE statement, it
+             can be part of an ALTER TABLE statement.
+         NF: Improved formatting of SQL keywords.  INSERT INTO statement, the
+             INTO will no longer be split onto a new line.
+         NF: Now correctly format the various JOIN keywords: NATURAL RIGHT
+             OUTER JOIN will be placed one online instead of just the JOIN
+             keyword as before.
+         BF: Did not properly handle the formatting of nested open parenthesis
+             in all cases.
+         BF: Using new technique to determine how to change the textwidth to
+             utilize more screen space when wrapping long lines.
+                           
+  1.2.0: Nov 30, 2002: 
+         NF: Create procedure uses shiftwidth for indent.
+         BF: Save/restore previous search.
+         
+  1.0.0: Nov 13, 2002: 
+         NF: Initial version.
+    
+==============================================================================
+6. Dependencies                                  *sqlutil-dependencies*
+
+       Align.vim - Version 15 (as a minimum)
+                 - Author: Charles E. Campbell, Jr.
+                 - http://www.vim.org/script.php?script_id=294
+                 - SQLUtilities uses this to extensively
+
+==============================================================================
+7. Complementary Plugins                       *sqlutil-complementary-plugins*
+
+       dbext.vim  - Author: Peter Bagyinszki and David Fishburn
+                  - http://www.vim.org/script.php?script_id=356
+                  - Works with almost all databases
+                  - Allows you to execute commands, browse through objects
+                    and many more items.
+
+       SrchRplcHiGrp.vim  
+                  - Author: David Fishburn
+                  - http://www.vim.org/script.php?script_id=848
+                  - Search and Replace based on a syntax highlight
+                    group name.  For example, you can visually select
+                    a block of code and tell it to change all the
+                    "yellow" words to UPPER case.
+                    
+       Intellisense.vim  
+                  - Author: Ravi Shankar
+                  - SQL plugin Author: David Fishburn
+                  - http://www.vim.org/scripts/script.php?script_id=747
+                  - Performs popup method completion for SQL development
+                    this includes, keywords, functions, tables, columns,
+                    procedures and more.
+
+==============================================================================
+8. TODO                                          *sqlutil-todo*
+
+  TODO:
+    1. Suggestions welcome email <fishburn@ianywhere.com>
+
+==============================================================================
+
+
+vim: ts=4 ft=help
