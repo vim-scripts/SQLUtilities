@@ -1,8 +1,9 @@
-" SQLUtilities:         Variety of tools for writing SQL
-"   Author:		David Fishburn <fishburn@sybase.com>
-"   Date:		Nov 23, 2002
-"   Last Changed:	Nov 23, 2002
-"   Version:	        1
+" SQLUtilities:   Variety of tools for writing SQL
+"   Author:	  David Fishburn <fishburn@sybase.com>
+"   Date:	  Nov 23, 2002
+"   Last Changed: Tue Feb 04 2003 9:20:51 PM
+"   Version:	  1.1
+"   Script:	  http://www.vim.org/script.php?script_id=492
 "
 "   Dependencies:
 "        Align.vim - Version 15
@@ -99,6 +100,12 @@
 "        the word in the unnamed buffer.  Calling the function with
 "        a parameter enables this feature.
 "
+"        This also uses the g:sqlutil_cmd_terminator to determine when
+"        the create table statement ends if none of the following terms
+"        are found before the final );
+"               primary,reference,unique,check,foreign
+"        sqlutil_cmd defaults to ";"
+"
 "
 "   Functions:
 "   GetColumnDef( optional parameter )
@@ -154,6 +161,13 @@
 "                          the table definition exists in any open 
 "                          buffer.  The column list is placed in the unnamed
 "                          buffer.
+"                          This also uses the g:sqlutil_cmd_terminator
+"                          This routine can optionally take 2 parameters
+"                          CreateColumnList T1 
+"                              Creates a column list for T1
+"                          CreateColumnList T1 1
+"                              Creates a column list for T1 but only for
+"                              the primary keys for that table.
 "   GetColumnDef         : Displays the column definition of the column name
 "                          under the cursor.  It assumes the CREATE TABLE
 "                          statement is in an open buffer.
@@ -164,20 +178,16 @@
 "
 "   
 "   Suggested Mappings:
-"       vmap <silent>sf <Esc>:SQLFormatter<CR>
-"       nmap <silent>scl  :CreateColumnList<CR>
-"       nmap <silent>sclp :CreateColumnList replace<CR>
-"       nmap <silent>scd  :GetColumnDef<CR>
-"       nmap <silent>scdp :GetColumnDef replace<CR>
-"       nmap <silent>scp  :CreateProcedure<CR>
+"       vmap <silent>sf   <Esc>:SQLFormatter<CR>
+"       nmap <silent>scl       :CreateColumnList<CR>
+"       nmap <silent>scd       :GetColumnDef<CR>
+"       nmap <silent>scp       :CreateProcedure<CR>
 "
 "       mnemonic explanation
 "       s - sql
-"         f - format
+"         f  - format
 "         cl - column list
-"            p - paste (result)
 "         cd - column definition
-"            p - paste (result)
 "         cp - create procedure
 "
 "       To prevent the default mappings from being created, place the 
@@ -189,20 +199,27 @@
 "
 "
 "   History:
-"     1  : Sept 13, 2002 : Initial version
+"     1  : Nov 13, 2002 : Initial version
+"     2  : Nov 30, 2002 : Create procedure uses shiftwidth for indent
+"                         Save/restore previous search
 " ---------------------------------------------------------------------
 
 " Prevent duplicate loading
 if exists("g:loaded_sqlutilities") || &cp
     finish
 endif
-let g:loaded_sqlutilities= 1
+let g:loaded_sqlutilities = 1
+
+if !exists('g:sqlutil_cmd_terminator')
+    let g:sqlutil_cmd_terminator = ';'
+endif
 
 " Public Interface:
-com! -range -nargs=* SQLFormatter <line1>,<line2>call <SID>SQLFormatter(<f-args>)
+com! -range -nargs=* SQLFormatter 
+            \          <line1>,<line2>call <SID>SQLFormatter(<f-args>)
 com!        -nargs=* CreateColumnList call CreateColumnList(<f-args>)
-com!        -nargs=* GetColumnDef call GetColumnDef(<f-args>)
-com!        -nargs=* CreateProcedure call CreateProcedure(<f-args>)
+com!        -nargs=* GetColumnDef     call GetColumnDef(<f-args>)
+com!        -nargs=* CreateProcedure  call CreateProcedure(<f-args>)
 
 if !exists("g:sqlutil_load_default_maps")
     let g:sqlutil_load_default_maps = 1
@@ -225,19 +242,23 @@ endif
 
 " Global Maps:
 vmap <unique> <script> <Plug>SQLFormatter      :<C-U>SQLFormatter<CR>
-map  <unique> <script> <Plug>CreateColumnList  :CreateColumnList<CR>
-map  <unique> <script> <Plug>GetColumnDef      :GetColumnDef<CR>
-map  <unique> <script> <Plug>CreateProcedure   :CreateProcedure<CR>
+nmap <unique> <script> <Plug>CreateColumnList  :CreateColumnList<CR>
+nmap <unique> <script> <Plug>GetColumnDef      :GetColumnDef<CR>
+nmap <unique> <script> <Plug>CreateProcedure   :CreateProcedure<CR>
 
 if has("gui_running") && has("menu")
-    vnoremenu <script> Plugin.SQLUtil.Format\ Statement      :SQLFormatter<CR>
-    noremenu  <script> Plugin.SQLUtil.Format\ Statement      :SQLFormatter<CR>
-    noremenu  <script> Plugin.SQLUtil.Create\ Procedure      :CreateProcedure<CR>
-    inoremenu <script> Plugin.SQLUtil.Create\ Procedure    <C-O>:CreateProcedure<CR>
-    noremenu  <script> Plugin.SQLUtil.Create\ Column\ List   :CreateColumnList<CR>
-    inoremenu <script> Plugin.SQLUtil.Create\ Column\ List <C-O>:CreateColumnList<CR>
-    noremenu  <script> Plugin.SQLUtil.Column\ Definition     :GetColumnDef<CR>
-    inoremenu <script> Plugin.SQLUtil.Column\ Definition   <C-O>:GetColumnDef<CR>
+    vnoremenu <script> Plugin.SQLUtil.Format\ Statement  :SQLFormatter<CR>
+    noremenu  <script> Plugin.SQLUtil.Format\ Statement  :SQLFormatter<CR>
+    noremenu  <script> Plugin.SQLUtil.Create\ Procedure  :CreateProcedure<CR>
+    inoremenu <script> Plugin.SQLUtil.Create\ Procedure  
+                \ <C-O>:CreateProcedure<CR>
+    noremenu  <script> Plugin.SQLUtil.Create\ Column\ List   
+                \ :CreateColumnList<CR>
+    inoremenu <script> Plugin.SQLUtil.Create\ Column\ List 
+                \ <C-O>:CreateColumnList<CR>
+    noremenu  <script> Plugin.SQLUtil.Column\ Definition :GetColumnDef<CR>
+    inoremenu <script> Plugin.SQLUtil.Column\ Definition 
+                \ <C-O>:GetColumnDef<CR>
 endif
 
 " SQLFormatter: align selected text based on alignment pattern(s)
@@ -248,6 +269,9 @@ function! s:SQLFormatter(...) range
     let hlsearch = &hlsearch
     let &hlsearch = 0
 
+    " save previous search string
+    let saveSearch = @/ 
+    
     call s:ReformatStatement()
     call s:IndentSubqueries()
     call s:WrapLongLines()
@@ -256,6 +280,9 @@ function! s:SQLFormatter(...) range
     let &hlsearch = hlsearch
     call s:WrapperEnd()
 
+    " restore previous search string
+    let @/ = saveSearch
+    
     " Position cursor at start of block
     '<
 endfunction
@@ -270,13 +297,16 @@ function! s:CountUnbalancedParan( line, paran_to_check )
     let rp = substitute(l, '[^)]', '', 'g')
 
     if a:paran_to_check =~ ')'
-        " echom 'CountUnbalancedParan ) returning: ' . (strlen(rp) - strlen(lp))
+        " echom 'CountUnbalancedParan ) returning: ' 
+        " \ . (strlen(rp) - strlen(lp))
         return (strlen(rp) - strlen(lp))
     elseif a:paran_to_check =~ '('
-        " echom 'CountUnbalancedParan ( returning: ' . (strlen(lp) - strlen(rp))
+        " echom 'CountUnbalancedParan ( returning: ' 
+        " \ . (strlen(lp) - strlen(rp))
         return (strlen(lp) - strlen(rp))
     else
-        " echom 'CountUnbalancedParan unknown paran to check: ' . a:paran_to_check
+        " echom 'CountUnbalancedParan unknown paran to check: ' . 
+        " \ a:paran_to_check
         return 0
     endif
 endfunction
@@ -291,14 +321,17 @@ function! s:IndentFrom( start_line, end_line, nest_level )
             let unbal_right = s:CountUnbalancedParan( line, ')' )
             if unbal_left > 0
                 " There is a open left paranethesis increase indent
-                let indent_to = s:IndentFrom( linenum+1, a:end_line, a:nest_level+1 )
-                " Decho( "IndentFrom: " . a:start_line+1 . " , ".indent_to." line: " . line )
+                let indent_to = s:IndentFrom( linenum+1, 
+                            \ a:end_line, a:nest_level+1 )
+                " Decho( "IndentFrom: " . a:start_line+1 . 
+                " \ " , ".indent_to." line: " . line )
                 silent exec linenum+1 . "," . indent_to . ">>"
 
                 let linenum = indent_to
 
             elseif unbal_right > 0
-                " Decho 'linenum: ' . linenum . ' ) un: ' . strlen(num_unmatched_right) . '  line: ' . line
+                " Decho 'linenum: ' . linenum . ' ) un: ' . 
+                " \ strlen(num_unmatched_right) . '  line: ' . line
                 return linenum
             endif
         endif
@@ -355,7 +388,8 @@ endfunction
 " Example
 " 
 function! s:ReformatStatement()
-    " call Decho("'<=".line("'<").":".col("'<")."  '>=".line("'>").":".col("'>"))
+    " call Decho("'<=".line("'<").":".col("'<")."  '>=".
+    " \ line("'>").":".col("'>"))
     " Join block of text into 1 line
     silent 'y+1,'z-1j
     " Reformat the commas, to remove any spaces before them
@@ -366,7 +400,13 @@ function! s:ReformatStatement()
     " Go to the start of the block
     silent 'y+1
     " force each keyword onto a newline
-    silent 'y+1,'z-1s/\(^\s*\)\@<!\<\(create\|drop\|call\|select\|update\|set\|into\|from\|join\|on\|where\|and\|or\|order\|group\|having\|for\|insert\|values\|union\|subscribe\)\>/\r\2/gei
+    let sql_keywords =  'create\|drop\|call\|select\|update\|set\|' .
+                \ 'into\|from\|join\|on\|where\|and\|or\|order\|group\|' .
+                \ 'having\|for\|insert\|values\|union\|subscrib\|' .
+                \ 'intersect\|except'
+    silent exec "'y+1,'z-1".'s/\(^\s*\)\@<!\<\('.
+                \ sql_keywords.
+                \ '\)\>/\r\2/gei'
     " Ensure keywords at the beginning of a line have a space after them
     " This will ensure the Align program lines them up correctly
     silent 'y+1,'z-1s/^\([a-zA-Z0-9_]*\)(/\1 (/e
@@ -421,10 +461,12 @@ function! s:IndentSubqueries()
         let &textwidth = 80
     endif
 
-    " call Decho(" Before IndentFrom 'y+1=".line("'<").":".col("'<")."  'z-1=".line("'>").":".col("'>"))
+    " call Decho(" Before IndentFrom 'y+1=".line("'<").
+    " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
     " Recursively call IndentFrom to indent nested subqueries
     let indent_to = s:IndentFrom( line("'y+1"), line("'z-1"), 0 )
-    " call Decho(" After IndentFrom 'y+1=".line("'<").":".col("'<")."  'z-1=".line("'>").":".col("'>"))
+    " call Decho(" After IndentFrom 'y+1=".line("'<").
+    " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
 
     let &textwidth = org_textwidth
 endfunction
@@ -443,19 +485,22 @@ function! s:WrapLongLines()
         let &textwidth = 80
     endif
 
-    " call Decho(" Before column splitter 'y+1=".line("'<").":".col("'<")."  'z-1=".line("'>").":".col("'>"))
+    " call Decho(" Before column splitter 'y+1=".line("'<").
+    " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
     while linenum <= (line("'z-1"))
         let line = getline(linenum)
-        if line =~? '^\s*\(select\|set\|into\|from\|values\|order\|group\|having\)'
-                " Decho 'linenum: ' . linenum . ' strlen: ' . strlen(line) . ' textwidth: ' . &textwidth . '  line: ' . line
-
+        let sql_keywords = '^\s*\(select\|set\|into\|from\|values'.
+                    \ '\|order\|group\|having\)'
+        if line =~? sql_keywords
             " Set the textwidth to current value
             " minus an adjustment for select and set
             " minus any indent value this may have
             let &textwidth = &textwidth - 10 - indent(".")
 
             if strlen( line ) > &textwidth
-                " Decho 'linenum: ' . linenum . ' strlen: ' . strlen(line) . ' textwidth: ' . &textwidth . '  line: ' . line
+                " Decho 'linenum: ' . linenum . ' strlen: ' .
+                " \ strlen(line) . ' textwidth: ' . &textwidth .
+                " \ '  line: ' . line
                 " go to the current line
                 exec linenum 
                 " Mark the start of the wide line
@@ -494,10 +539,10 @@ function! s:WrapLongLines()
                 let linenum = line("'e") - 1
             endif
         endif
-                let &textwidth = org_textwidth
-                if &textwidth == 0 
-                    let &textwidth = 80
-                endif
+        let &textwidth = org_textwidth
+        if &textwidth == 0 
+            let &textwidth = 80
+        endif
         let linenum = linenum + 1
     endwhile
 
@@ -517,9 +562,12 @@ function! s:SplitUnbalParan()
                     " to line up the columns with
                     " Find the FIRST occurrence of ( and replace
                     " it with a new line and -@-(
-                    " call Decho( " l: " .linenum." left: ".num_unmatched_left." line: ".getline(linenum). " ol: ".line )
+                    " call Decho( " l: " .linenum." left: ".
+                    " \ num_unmatched_left." line: ".getline(linenum).
+                    " \ " ol: ".line )
                     " silent exec linenum . ',' . linenum . 's/(/(\r-@-'
-                    silent exec linenum . ',' . linenum . 's/\((.*\)(/\1\r-@-(/e'
+                    silent exec linenum . ',' . linenum .
+                                \ 's/\((.*\)(/\1\r-@-(/e'
                     let num_unmatched_left = num_unmatched_left - 1
                 endwhile
                 " Since newlines were added, continue on the next
@@ -577,9 +625,18 @@ function! CreateColumnList(...)
         let only_primary_key = 0
     endif
 
+    " save previous search string
+    let saveSearch = @/
+    let saveZ      = @z
+    let columns    = ""
     
-    let srch_create_table = '^[ \t]*create.*table.*\<' . table_name . '\>'
-    let columns = ""
+    " ignore case
+    if( only_primary_key == 0 )
+        let srch_table = '\c^[ \t]*create.*table.*\<'.table_name.'\>'
+    else
+        let srch_table = '\c^[ \t]*\(create\|alter\).*table.*\<'.
+                    \ table_name.'\>'
+    endif
 
     " Loop through all currenly open buffers to look for the 
     " CREATE TABLE statement, if found build the column list
@@ -593,27 +650,40 @@ function! CreateColumnList(...)
     "   PRIMARY KEY ("id")
     " );
     while( 1==1 )
-        if( search( srch_create_table, "w" ) ) > 0
+        " Mark the current line to return to
+        let buf_curline     = line(".")
+        let buf_curcol      = virtcol(".")
+        " From the top of the file
+        let cmd = 'silent normal! gg'."\n"
+        exe cmd
+        if( search( srch_table, "W" ) ) > 0
             if( only_primary_key == 0 )
                 " Get the list of all columns for the table
-                
-                " From the top of the file
-                let cmd = 'silent normal! gg'."\n"
-                " Find the create table statement
-                exe cmd
-                let cmd = 'silent normal! /'.srch_create_table."\n"
-                exe cmd
+                " let cmd = 'silent normal! /'.srch_create_table."\n"
+                " exe cmd
                 " Find the opening ( that starts the column list
                 " and move down one line
-                let cmd = cmd . '/('."\n".'j'
+                let cmd = 'normal! /('."\n".'j'
                 " Visually select until the following keyword are the beginning
                 " of the line, this should be at the bottom of the column list
                 " Backup up one line so this line is not included
                 exe cmd
+                " Start visually selecting columns
                 let cmd = 'silent normal! V'."\n"
-                exe cmd
-                let cmd = 'silent normal! /^[ \t]*\(;\|primary\|reference\|unique\|check\|foreign\)/-'."\n\<ESC>"
-                " let cmd = cmd . 'V/^[ \t]*\(;\|primary\|reference\|unique\|check\|foreign\)/-'."\n\<ESC>"
+                let cmd = cmd . '/^[ \t]*' " ignore spaces and tabs at start
+                            " Stop visually selecting until the 
+                            " following keywords
+                let cmd = cmd . '\(' 
+                            " Closing ) followed by cmd terminator
+                let cmd = cmd . ')\?\s*'.g:sqlutil_cmd_terminator
+                let cmd = cmd . '\|primary' " PRIMARY KEY
+                let cmd = cmd . '\|reference' " foreign keys
+                let cmd = cmd . '\|unique' " indicies
+                let cmd = cmd . '\|check' " check contraints
+                let cmd = cmd . '\|foreign' " foreign keys
+                let cmd = cmd . '\)' " end of criteria
+                let cmd = cmd . '/-' "back up one line
+                let cmd = cmd . "\n\<ESC>" " hit enter to complete the command
                 " Decho cmd
                 exe cmd
                 noh
@@ -625,7 +695,9 @@ function! CreateColumnList(...)
                     let line = getline(start_line)
                     " Decho line
                     " Strip out the column name
-                    let columns = columns . substitute( line, '^[ \t"]*\(\w\+\).*,\(.*\)', '\1', "g" )
+                    let columns = columns .
+                                \ substitute( line, 
+                                \ '^[ \t"]*\(\w\+\).*,\?\(.*\)', '\1', "g" )
                     " Decho columns
                     if start_line < end_line
                         let columns = columns . ", "
@@ -633,27 +705,30 @@ function! CreateColumnList(...)
                     let start_line = start_line + 1
                 endwhile
             else
-                " Only retrieve the primary key columns
-                 
-                " From the top of the file
-                let cmd = 'silent normal! gg'."\n"
-                " Find the create table statement
-                let cmd = cmd . '/'.srch_create_table."\n"
                 " Find the primary key statement
-                let cmd = cmd . '/\cPRIMARY KEY'."\n"
-                " Decho cmd
-                exe cmd
+                if( search( '\cPRIMARY KEY[\n\s]*', "W" ) ) > 0
+                    exe 'silent! norm! /(/e+1'."\n".'v/)/e-1'."\n".'"zy'
+                    let columns = @z
+                    " Strip newlines characters
+                    let columns = substitute( columns, 
+                                \ "[\n]", '', "g" )
+                    " Strip everything but the column list
+                    let columns = substitute( columns, 
+                                \ '\s*\(.*\)\s*', '\1', "g" )
+                    " Remove double quotes
+                    let columns = substitute( columns, '"', '', "g" )
+                    let columns = substitute( columns, ',\s*', ', ', "g" )
+                    let columns = substitute( columns, '^\s*', '', "g" )
+                    let columns = substitute( columns, '\s*$', '', "g" )
+                    let found = 1
+                endif
                 noh
-
-                " Strip everything but the column list
-                let found = 1
-                let columns = getline(".")
-                let columns = substitute( columns, '.*[(]\s*\(.*\)[)].*', '\1', "g" )
-                let columns = substitute( columns, '"', '', "g" )
-                let columns = substitute( columns, '\s*$', '', "g" )
             endif
 
         endif
+
+        " Return to previous location
+        exe 'norm! '.buf_curline.'G'.buf_curcol."\<bar>"
 
         if found == 1
             break
@@ -677,11 +752,15 @@ function! CreateColumnList(...)
     " Return to previous location
     exe 'norm! '.curline.'G'.curcol."\<bar>"
 
+    " restore previous search
+    let @/ = saveSearch
+    let @z = saveZ
+
     redraw
 
     if found == 0
         let @@ = ""
-        echo "Table: " . table_name . " was not found"
+        echo "CreateColumnList - Table: " . table_name . " was not found"
         return ""
     endif 
 
@@ -764,6 +843,10 @@ function! GetColumnDef( ... )
     "   PRIMARY KEY ("id")
     " );
     while( 1==1 )
+        " Mark the current line to return to
+        let buf_curline     = line(".")
+        let buf_curcol      = virtcol(".")
+
         if( search( srch_column_name, "w" ) ) > 0
             " From the top of the file
             let cmd = 'silent normal! gg'."\n"
@@ -783,6 +866,9 @@ function! GetColumnDef( ... )
             let column_def = GetColumnDatatype( line )
 
         endif
+
+        " Return to previous location
+        exe 'norm! '.buf_curline.'G'.buf_curcol."\<bar>"
 
         if found == 1
             break
@@ -847,6 +933,9 @@ function! CreateProcedure()
     let curcol      = virtcol(".")
     let curbuf      = bufnr(expand("<abuf>"))
     let found       = 0
+    " save previous search string
+    let saveSearch=@/ 
+    
 
     if(a:0 > 0) 
         let table_name  = a:1
@@ -854,13 +943,23 @@ function! CreateProcedure()
         let table_name  = expand("<cword>")
     endif
 
+    let i = 0
+    let indent_spaces = ''
+    while( i < &shiftwidth )
+        let indent_spaces = indent_spaces . ' '
+        let i = i + 1
+    endwhile
     
-    let srch_create_table = '^[ \t]*create.*table.*\<' . table_name . '\>'
+    " ignore case
+    let srch_create_table = '\c^[ \t]*create.*table.*\<' . table_name . '\>'
     let procedure_def = "CREATE PROCEDURE sp_" . table_name . "(\n"
 
     let column_list = CreateColumnList(table_name)
     if strlen(column_list) == 0
         echo "Table: " . table_name . " was not found"
+        " restore previous search string
+        let @/ = saveSearch
+    
         return
     endif
     let pk_column_list = CreateColumnList(table_name, 'primary_keys')
@@ -878,6 +977,10 @@ function! CreateProcedure()
     "   PRIMARY KEY ("id")
     " );
     while( 1==1 )
+        " Mark the current line to return to
+        let buf_curline     = line(".")
+        let buf_curcol      = virtcol(".")
+
         if( search( srch_create_table, "w" ) ) > 0
             " From the top of the file
             let cmd = 'silent normal! gg'."\n"
@@ -888,8 +991,22 @@ function! CreateProcedure()
             let cmd = cmd . '/('."\n".'j'
             " Visually select until the following keyword are the beginning
             " of the line, this should be at the bottom of the column list
-            " Backup up one line so this line is not included
-            let cmd = cmd . 'V/^[ \t]*\(;\|primary\|reference\|unique\|check\|foreign\)/-'."\n\<ESC>"
+            " Start visually selecting columns
+            let cmd = 'silent normal! V'."\n"
+            let cmd = cmd . '/^[ \t]*' " ignore spaces and tabs at start
+                        " Stop visually selecting until the 
+                        " following keywords
+            let cmd = cmd . '\(' 
+                        " Closing ) followed by cmd terminator
+            let cmd = cmd . ')\?\s*'.g:sqlutil_cmd_terminator
+            let cmd = cmd . '\|primary' " PRIMARY KEY
+            let cmd = cmd . '\|reference' " foreign keys
+            let cmd = cmd . '\|unique' " indicies
+            let cmd = cmd . '\|check' " check contraints
+            let cmd = cmd . '\|foreign' " foreign keys
+            let cmd = cmd . '\)' " end of criteria
+            let cmd = cmd . '/-' "back up one line
+            let cmd = cmd . "\n\<ESC>" " hit enter to complete the command
             " Decho cmd
             exe cmd
             noh
@@ -901,10 +1018,13 @@ function! CreateProcedure()
             while start_line <= end_line
                 let line = getline(start_line)
                 " Decho line
-                let column_name = substitute( line, '[ \t"]*\(\<\w*\>\).*', '\1', "g" )
+                let column_name = substitute( line, 
+                            \ '[ \t"]*\(\<\w*\>\).*', '\1', "g" )
                 let column_def = GetColumnDatatype( line )
-                let procedure_def = procedure_def . "IN @" . column_name 
-                let procedure_def = procedure_def . ' ' . column_def
+                let procedure_def = procedure_def . 
+                            \ indent_spaces .
+                            \ "IN @" . column_name .
+                            \ ' ' . column_def
                 if start_line < end_line
                     let procedure_def = procedure_def .  ",\n"
                 else
@@ -936,39 +1056,89 @@ function! CreateProcedure()
             let procedure_def = procedure_def . "BEGIN\n\n" 
             
             " Create a sample SELECT statement
-            let procedure_def = procedure_def . "SELECT " . column_list . "\n" 
-            let procedure_def = procedure_def . "  FROM " . table_name . "\n"
-            let where_clause = substitute( column_list, '^\(\<\w*\>\)\(.*\)', " WHERE \\1 = \@\\1\\2", "g" )
-            let where_clause = substitute( where_clause, ', \(\<\w*\>\)', "\n   AND \\1 = @\\1", "g" )
+            let procedure_def = procedure_def . 
+                        \ indent_spaces .
+                        \ "SELECT " . column_list . "\n" .
+                        \ indent_spaces .
+                        \ "  FROM " . table_name . "\n"
+            let where_clause = indent_spaces . 
+                        \ substitute( column_list, 
+                        \ '^\(\<\w*\>\)\(.*\)', " WHERE \\1 = \@\\1\\2", "g" )
+            let where_clause = 
+                        \ substitute( where_clause, 
+                        \ ', \(\<\w*\>\)', 
+                        \ "\n" . indent_spaces . "   AND \\1 = @\\1", "g" )
             let procedure_def = procedure_def . where_clause . ";\n\n"
 
             " Create a sample INSERT statement
-            let procedure_def = procedure_def . "INSERT INTO " . table_name . "( " 
-            let procedure_def = procedure_def . column_list
-            let procedure_def = procedure_def . " )\n"
-            let procedure_def = procedure_def . "VALUES( "
-            let procedure_def = procedure_def . substitute( column_list, '\(\<\w*\>\)', '@\1', "g" )
-            let procedure_def = procedure_def . " );\n\n"
+            let procedure_def = procedure_def . 
+                        \ indent_spaces . 
+                        \ "INSERT INTO " . table_name . "( " .
+                        \ column_list .
+                        \ " )\n"
+            let procedure_def = procedure_def . 
+                        \ indent_spaces .
+                        \ "VALUES( " .
+                        \ substitute( column_list, '\(\<\w*\>\)', '@\1', "g" ).
+                        \ " );\n\n"
 
             " Create a sample UPDATE statement
-            let procedure_def = procedure_def . "UPDATE " . table_name . "\n" 
-            let no_pk_column_list = strpart( column_list, strlen(pk_column_list) )
-            let set_clause = substitute( no_pk_column_list, ', \(\<\w*\>\)\(.*\)', "   SET \\1 = \@\\1\\2", "g" )
-            let set_clause = substitute( set_clause, ', \(\<\w*\>\)', ",\n       \\1 = @\\1", "g" )
-            let where_clause = substitute( pk_column_list, '^\(\<\w*\>\)\(.*\)', " WHERE \\1 = \@\\1\\2", "g" )
-            let where_clause = substitute( where_clause, ', \(\<\w*\>\)', "\n   AND \\1 = @\\1", "g" )
+            let procedure_def = procedure_def . 
+                        \ indent_spaces .
+                        \ "UPDATE " . table_name . "\n" 
+            echom 'column_list: '.column_list
+            echom 'pk_column_list: '.pk_column_list
+            let no_pk_column_list = 
+                        \ strpart( column_list, strlen(pk_column_list) )
+            " Check for the special case where there is no 
+            " primary key for the table (ie ,\? \? )
+            let set_clause = 
+                        \ indent_spaces .
+                        \ substitute( no_pk_column_list, 
+                        \ ',\? \?\(\<\w*\>\)', 
+                        \ "   SET \\1 = \@\\1", "" )
+            let set_clause = 
+                        \ substitute( set_clause, 
+                        \ ', \(\<\w*\>\)', 
+                        \ ",\n" . indent_spaces . "       \\1 = @\\1", "g" )
+            " Check for the special case where there is no 
+            " primary key for the table
+            if strlen(pk_column_list) > 0
+                let where_clause = 
+                            \ indent_spaces .
+                            \ substitute( pk_column_list, 
+                            \ '^\(\<\w*\>\)', " WHERE \\1 = \@\\1", "" ) 
+                let where_clause = 
+                            \ substitute( where_clause, 
+                            \ ', \(\<\w*\>\)', 
+                            \ "\n" . indent_spaces . "   AND \\1 = @\\1", "g" )
+            else
+                " If there is no primary key for the table place
+                " all columns in the WHERE clause
+                let where_clause = 
+                            \ indent_spaces .
+                            \ substitute( column_list, 
+                            \ '^\(\<\w*\>\)', " WHERE \\1 = \@\\1", "" ) 
+                let where_clause = 
+                            \ substitute( where_clause, 
+                            \ ', \(\<\w*\>\)', 
+                            \ "\n" . indent_spaces . "   AND \\1 = @\\1", "g" )
+            endif
             let procedure_def = procedure_def . set_clause . "\n" 
             let procedure_def = procedure_def . where_clause .  ";\n\n"
 
             " Create a sample DELETE statement
-            let procedure_def = procedure_def . "DELETE FROM " . table_name . "\n" 
-            let where_clause = substitute( pk_column_list, '^\(\<\w*\>\)\(.*\)', " WHERE \\1 = \@\\1\\2", "g" )
-            let where_clause = substitute( where_clause, ', \(\<\w*\>\)', "\n   AND \\1 = @\\1", "g" )
+            let procedure_def = procedure_def . 
+                        \ indent_spaces .
+                        \ "DELETE FROM " . table_name . "\n" 
             let procedure_def = procedure_def . where_clause . ";\n\n"
 
             let procedure_def = procedure_def . "END;\n\n" 
             
         endif
+
+        " Return to previous location
+        exe 'norm! '.buf_curline.'G'.buf_curcol."\<bar>"
 
         if found == 1
             break
@@ -989,6 +1159,9 @@ function! CreateProcedure()
     
     exec "buffer " . curbuf
 
+    " restore previous search string
+    let @/ = saveSearch
+    
     " Return to previous location
     exe 'norm! '.curline.'G'.curcol."\<bar>"
 
