@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	  David Fishburn <fishburn@ianywhere.com>
 "   Date:	  Nov 23, 2002
-"   Last Changed: Wed Jul 21 2004 11:17:46 PM
-"   Version:	  1.3.7
+"   Last Changed: Thu Dec 02 2004 12:21:26 PM
+"   Version:	  1.3.8
 "   Script:	  http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -18,7 +18,7 @@
 if exists("g:loaded_sqlutilities") || &cp
     finish
 endif
-let g:loaded_sqlutilities = 1
+let g:loaded_sqlutilities = 138
 
 if !exists('g:sqlutil_align_where')
     let g:sqlutil_align_where = 1
@@ -34,6 +34,10 @@ endif
 
 if !exists('g:sqlutil_cmd_terminator')
     let g:sqlutil_cmd_terminator = ';'
+endif
+
+if !exists('g:sqlutil_stmt_keywords')
+    let g:sqlutil_stmt_keywords = 'select,insert,update,delete,with,merge'
 endif
 
 if !exists('g:sqlutil_keyword_case')
@@ -56,7 +60,7 @@ if !exists('g:sqlutil_use_tbl_alias')
     "   d - use by default
     "   a - ask (prompt)
     "   n - no
-    let g:sqlutil_use_tbl_alias = 'd'
+    let g:sqlutil_use_tbl_alias = 'a'
 endif
 
 if !exists('g:sqlutil_col_list_terminators')
@@ -89,8 +93,10 @@ if !exists('g:sqlutil_col_list_terminators')
 endif
 
 " Public Interface:
+command! -range=% -nargs=* SQLUFormatStmts <line1>,<line2> 
+            \ call s:SQLU_FormatStmts(<q-args>)
 command! -range -nargs=* SQLUFormatter <line1>,<line2> 
-            \ call s:SQLU_Formatter(<f-args>)
+            \ call s:SQLU_Formatter(<q-args>)
 command!        -nargs=* SQLUCreateColumnList  
             \ call SQLU_CreateColumnList(<f-args>)
 command!        -nargs=* SQLUGetColumnDef 
@@ -105,7 +111,13 @@ if !exists("g:sqlutil_load_default_maps")
 endif 
 
 if(g:sqlutil_load_default_maps == 1)
+    if !hasmapto('<Plug>SQLUFormatStmts')
+        nmap <unique> <Leader>sfr <Plug>SQLUFormatStmts
+        vmap <unique> <Leader>sfr <Plug>SQLUFormatStmts
+    endif 
     if !hasmapto('<Plug>SQLUFormatter')
+        nmap <unique> <Leader>sfs <Plug>SQLUFormatter
+        vmap <unique> <Leader>sfs <Plug>SQLUFormatter
         nmap <unique> <Leader>sf <Plug>SQLUFormatter
         vmap <unique> <Leader>sf <Plug>SQLUFormatter
     endif 
@@ -124,6 +136,8 @@ if(g:sqlutil_load_default_maps == 1)
 endif 
 
 if exists("g:loaded_sqlutilities_global_maps")
+    vunmap <unique> <script> <Plug>SQLUFormatStmts
+    nunmap <unique> <script> <Plug>SQLUFormatStmts
     vunmap <unique> <script> <Plug>SQLUFormatter
     nunmap <unique> <script> <Plug>SQLUFormatter
     nunmap <unique> <script> <Plug>SQLUCreateColumnList
@@ -133,8 +147,10 @@ if exists("g:loaded_sqlutilities_global_maps")
 endif
 
 " Global Maps:
-vmap <unique> <script> <Plug>SQLUFormatter         :SQLUFormatter<CR>
-nmap <unique> <script> <Plug>SQLUFormatter         :SQLUFormatter<CR>
+vmap <unique> <script> <Plug>SQLUFormatStmts       :SQLUFormatStmts v<CR>
+nmap <unique> <script> <Plug>SQLUFormatStmts       :SQLUFormatStmts n<CR>
+vmap <unique> <script> <Plug>SQLUFormatter         :SQLUFormatter v<CR>
+nmap <unique> <script> <Plug>SQLUFormatter         :SQLUFormatter n<CR>
 nmap <unique> <script> <Plug>SQLUCreateColumnList  :SQLUCreateColumnList<CR>
 nmap <unique> <script> <Plug>SQLUGetColumnDef      :SQLUGetColumnDef<CR>
 nmap <unique> <script> <Plug>SQLUGetColumnDataType :SQLUGetColumnDataType<CR>
@@ -142,6 +158,8 @@ nmap <unique> <script> <Plug>SQLUCreateProcedure   :SQLUCreateProcedure<CR>
 let g:loaded_sqlutilities_global_maps = 1
 
 if has("menu")
+    vnoremenu <script> Plugin.SQLUtil.Format\ Range\ Stmts :SQLUFormatStmts<CR>
+    noremenu  <script> Plugin.SQLUtil.Format\ Range\ Stmts :SQLUFormatStmts<CR>
     vnoremenu <script> Plugin.SQLUtil.Format\ Statement :SQLUFormatter<CR>
     noremenu  <script> Plugin.SQLUtil.Format\ Statement :SQLUFormatter<CR>
     noremenu  <script> Plugin.SQLUtil.Create\ Procedure :SQLUCreateProcedure<CR>
@@ -159,8 +177,12 @@ endif
 
 " SQLU_Formatter: align selected text based on alignment pattern(s)
 function! s:SQLU_Formatter(...) range
-    " call Decho("SQLU_Formatter() {")
-    call s:SQLU_WrapperStart( a:firstline, a:lastline )
+    let mode = 'n'
+    if a:0 > 0
+        let mode = (a:1 == ''?'n':(a:1))
+    endif
+
+    call s:SQLU_WrapperStart( a:firstline, a:lastline, mode )
     " Store pervious value of highlight search
     let hlsearch = &hlsearch
     let &hlsearch = 0
@@ -186,7 +208,7 @@ function! s:SQLU_Formatter(...) range
     " Restore default value
     " And restore cursor position
     let &hlsearch = hlsearch
-    call s:SQLU_WrapperEnd()
+    call s:SQLU_WrapperEnd(mode)
 
     " restore previous format options 
     let &formatoptions = saveFormatOptions 
@@ -196,6 +218,93 @@ function! s:SQLU_Formatter(...) range
     
 endfunction
 
+" SQLU_FormatStmts: 
+"    For a given range (default entire file), it find each SQL 
+"    statement an run SQLFormatter against it.
+"                 
+function! s:SQLU_FormatStmts(...) range
+    let mode = 'n'
+    if a:0 > 0
+        let mode = (a:1 == ''?'n':(a:1))
+    endif
+
+    let curline     = line(".")
+    let curcol      = virtcol(".")
+    let keepline_ms = line("'s")
+    let keepcol_ms  = virtcol("'s")
+    let keepline_me = line("'e")
+    let keepcol_me  = virtcol("'e")
+
+    silent! exec 'norm! '.a:lastline."G\<bar>0\<bar>"
+    " Add a new line to the bottom of the mark to be removed latter
+    put =''
+    silent! exec "ma e"
+    silent! exec 'norm! '.a:firstline."G\<bar>0\<bar>"
+    " Add a new line above the mark to be removed latter
+    put! = ''
+    silent! exec "ma s"
+    silent! exec "norm! 'sj"
+
+    " Store pervious value of highlight search
+    let hlsearch = &hlsearch
+    let &hlsearch = 0
+
+    " save previous search string
+    let saveSearch = @/ 
+
+    " save previous format options and turn off automatic formating
+    let saveFormatOptions = &formatoptions
+    silent execute 'setlocal formatoptions-=a'
+
+    " Must default the statements to query
+    let stmt_keywords = g:sqlutil_stmt_keywords
+
+    " Verify the string is in the correct format
+    " Strip off any trailing commas
+    let stmt_keywords =
+                \ substitute(stmt_keywords, ',$','','')
+    " Convert commas to regex ors
+    let stmt_keywords =
+                \ substitute(stmt_keywords, '\s*,\s*', '\\|', 'g')
+
+    let sql_commands = '\c\<\('.stmt_keywords.'\)\>'
+
+    " Find a line starting with SELECT|UPDATE|DELETE
+    "     .,-             - From that line backup one line due to :g
+    "     /;              - find the ending command delimiter
+    "     SQLUFormatter   - Use the SQLUtilities plugin to format it
+    let cmd = a:firstline.','.a:lastline.'g/^\s*\<\(' .
+                \ stmt_keywords . '\)\>/.,-/' .
+                \ g:sqlutil_cmd_terminator . '/SQLUFormatter'
+    exec cmd
+
+    " Restore default value
+    " And restore cursor position
+    let &hlsearch = hlsearch
+
+    " restore previous format options 
+    let &formatoptions = saveFormatOptions 
+
+    " restore previous search string
+    let @/ = saveSearch
+    
+    silent! exe 'norm! '.curline."G\<bar>".(curcol-1).
+				\ ((curcol-1)>0 ? 'l' : '' )
+
+    if (mode != 'n')
+        " Reselect the visual area, so the user can us gv
+        " to operate over the region again
+        exec 'normal! '.(line("'s")+1).'gg'.'|'.
+                    \ 'V'.(line("'e")-2-line("'s")).'j|'."\<Esc>"
+    endif
+
+    " Delete blanks lines added around the visually selected range
+    silent! exe "norm! 'sdd'edd"
+
+    silent! exe 'norm! '.curline."G\<bar>".(curcol-1).
+				\ ((curcol-1)>0 ? 'l' : '' )
+
+endfunction
 
 " This function will return a count of unmatched parenthesis
 " ie ( this ( funtion ) - will return 1 in this case
@@ -222,7 +331,7 @@ endfunction
 
 " WS: wrapper start (internal)   Creates guard lines,
 "     stores marks y and z, and saves search pattern
-function! s:SQLU_WrapperStart( beginline, endline )
+function! s:SQLU_WrapperStart( beginline, endline, mode )
     let b:curline     = line(".")
     let b:curcol      = virtcol(".")
     let b:keepsearch  = @/
@@ -230,43 +339,39 @@ function! s:SQLU_WrapperStart( beginline, endline )
     let b:keepcol_my  = virtcol("'y")
     let b:keepline_mz = line("'z")
     let b:keepcol_mz  = virtcol("'z")
+
     silent! exec 'norm! '.a:endline."G\<bar>0\<bar>"
     " Add a new line to the bottom of the mark to be removed latter
     put =''
-    " silent! exec "norm! mz'<"
     silent! exec "ma z"
     silent! exec 'norm! '.a:beginline."G\<bar>0\<bar>"
     " Add a new line above the mark to be removed latter
     put! = ''
-    " silent! exec "norm! my"
     silent! exec "ma y"
-    let b:ch= &ch
-    set ch=2
+    let b:cmdheight= &cmdheight
+    set cmdheight=2
     silent! exec "norm! 'zk"
-    " echom 'SQLU_WrapperStart'
-    " echom 'y-1l: '.(line("'y")-1).' t: '.getline(line("'y")-1)
-    " echom 'y: '.line("'y").' t: '.getline(line("'y"))
-    " echom 'z: '.line("'z").' t: '.getline(line("'z"))
-    " echom 'z+1: '.(line("'z")+1).' t: '.getline(line("'z")+1)
-
 endfunction
 
 " WE: wrapper end (internal)   Removes guard lines,
 "     restores marks y and z, and restores search pattern
-function! s:SQLU_WrapperEnd()
+function! s:SQLU_WrapperEnd(mode)
+    if (a:mode != 'n')
+        " Reselect the visual area, so the user can us gv
+        " to operate over the region again
+        exec 'normal! '.(line("'y")+1).'gg'.'|'.
+                    \ 'V'.(line("'z")-2-line("'y")).'j|'."\<Esc>"
+    endif
+
     " Delete blanks lines added around the visually selected range
-    silent! exe "norm! 'yjkdd'zdd"
-    silent! exe "set ch=".b:ch
-    unlet b:ch
+    silent! exe "norm! 'ydd'zdd"
+    silent! exe "set cmdheight=".b:cmdheight
+    unlet b:cmdheight
     let @/= b:keepsearch
-    " if b:keepline_my != 0
-    "     silent! exe 'norm! '.b:keepline_my."G\<bar>".b:keepcol_my."l"
-    " endif
-    " if b:keepline_mz != 0
-    "     silent! exe 'norm! '.b:keepline_mz."G\<bar>".b:keepcol_mz."l"
-    " endif
-    " silent! exe 'norm! '.b:curline."G\<bar>".b:curcol."l"
-    silent! exe 'norm! '.b:curline."G\<bar>".b:curcol."l"
+
+    silent! exe 'norm! '.b:curline."G\<bar>".(b:curcol-1).
+				\ ((b:curcol-1)>0 ? 'l' : '' )
+
     unlet b:keepline_my b:keepcol_my
     unlet b:keepline_mz b:keepcol_mz
     unlet b:curline     b:curcol
@@ -487,6 +592,9 @@ function! s:SQLU_ReformatStatement()
                 \ sql_keywords .
                 \ '\|' .
                 \ sql_case_keywords .
+                \ '\|' .
+                \ sql_join_type_keywords .
+                \ '\|OUTER' .
                 \ '\)\>/' .
                 \ g:sqlutil_keyword_case .
                 \ '\1/gei'
@@ -1261,7 +1369,7 @@ function! SQLU_CreateColumnList(...)
     " Prevent the alternate buffer (<C-^>) from being set to this
     " temporary file
     let l:old_cpoptions = &cpoptions
-    setlocal cpo-=A
+    setlocal cpo-=a
     
     " ignore case
     if( only_primary_key == 0 )
@@ -1619,8 +1727,10 @@ function! SQLU_CreateProcedure(...)
     let saveSearch=@/ 
     " Prevent the alternate buffer (<C-^>) from being set to this
     " temporary file
-    let l:old_cpoptions = &cpoptions
+    let l:old_cpoptions   = &cpoptions
+    let l:old_eventignore = &eventignore
     setlocal cpo-=A
+    setlocal eventignore=BufRead,BufReadPre,BufEnter,BufNewFile
 
     
 
@@ -1878,7 +1988,8 @@ function! SQLU_CreateProcedure(...)
     " restore previous search string
     let @/ = saveSearch
     " Restore previous cpoptions
-    let &cpoptions = l:old_cpoptions
+    let &cpoptions   = l:old_cpoptions
+    let &eventignore = l:old_eventignore
 
     
     " Return to previous location
