@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	  David Fishburn <fishburn@ianywhere.com>
 "   Date:	  Nov 23, 2002
-"   Last Changed: Mon Jun 21 2004 10:03:30
-"   Version:	  1.3.6
+"   Last Changed: Wed Jul 21 2004 11:17:46 PM
+"   Version:	  1.3.7
 "   Script:	  http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -43,6 +43,22 @@ if !exists('g:sqlutil_keyword_case')
     let g:sqlutil_keyword_case = ''
 endif
 
+if !exists('g:sqlutil_use_tbl_alias')
+    " If this is set to 1, when you run SQLU_CreateColumnList
+    " and you do not specify a 3rd parameter, you will be
+    " prompted for the alias name to append to the column list.
+    "
+    " The default for the alias are the initials for the table:
+    "     some_thing_with_under_bars -> stwub
+    "     somethingwithout           -> s
+    "
+    " The default is no asking
+    "   d - use by default
+    "   a - ask (prompt)
+    "   n - no
+    let g:sqlutil_use_tbl_alias = 'd'
+endif
+
 if !exists('g:sqlutil_col_list_terminators')
     " You can override which keywords will determine
     " when a column list finishes:
@@ -56,12 +72,20 @@ if !exists('g:sqlutil_col_list_terminators')
     "        );
     " So in the above example, when "primary" is reached, we
     " know the column list is complete.
+    "     PRIMARY KEY
+    "     foreign keys
+    "     indicies
+    "     check contraints
+    "     table contraints
+    "     foreign keys
+    " 
     let g:sqlutil_col_list_terminators = 
-                \ 'primary'    " PRIMARY KEY
-                \ ',reference' " foreign keys
-                \ ',unique'    " indicies
-                \ ',check'     " check contraints
-                \ ',foreign'   " foreign keys
+                \ 'primary\s\+key.*(' .              
+                \ ',references' .                    
+                \ ',unique' .                        
+                \ ',check' .                         
+                \ ',constraint' .                    
+                \ ',\%(not\s\+null\s\+\)\?foreign'   
 endif
 
 " Public Interface:
@@ -939,6 +963,7 @@ function! s:SQLU_WrapLongLines()
                 silent! exec linenum 
                 " Mark the start of the wide line
                 silent! exec "normal mb"
+                let markb = linenum
                 " echom "line b - ".getline("'b")
                 " Mark the next line
                 silent! exec "normal jmek"
@@ -962,8 +987,9 @@ function! s:SQLU_WrapLongLines()
                 else
                     " Place the special marker that the first non-whitespace
                     " characeter
-                    if g:sqlutil_align_comma == 1 
-                        silent! exec linenum . ',' . linenum . 's/^\s*\zs,\s*/,  -@-'
+                    if g:sqlutil_align_comma == 1  && line =~ '^\s*,'
+                        silent! exec linenum . ',' . linenum .
+                                    \ 's/^\s*\zs,\s*/,  -@-'
                     else
                         silent! exec linenum . ',' . linenum . 's/\S/-@-&'
                     endif
@@ -979,6 +1005,7 @@ function! s:SQLU_WrapLongLines()
                 " so we need to double check the end range to 
                 " ensure it does go backwards
                 let begin_line_nbr = (line("'b") + 1)
+                let begin_line_nbr = (markb + 1)
                 let end_line_nbr = (line("'e") - 1)
                 " echom "b- ".begin_line_nbr."  e- ".end_line_nbr
                 if end_line_nbr < begin_line_nbr
@@ -993,21 +1020,24 @@ function! s:SQLU_WrapLongLines()
                 " silent! exec "'b,".end_line_nbr.'s/\s*,/,/ge'
                 " Add a space after the comma
                 " silent! 'b,'e-s/,\(\w\)/, \1/ge
-                silent! exec "'b,".end_line_nbr.'s/,\(\w\)/, \1/ge'
+                " silent! exec "'b,".end_line_nbr.'s/,\(\w\)/, \1/ge'
+                silent! exec markb.",".end_line_nbr.'s/,\(\w\)/, \1/ge'
 
                 " Append the special marker to the beginning of the line
                 " for Align.vim
                 " silent! exec "'b+," .end_line_nbr. 's/\s*\(.*\)/-@-\1'
-                silent! exec "'b+," .end_line_nbr. 's/^\s*/-@-'
+                " silent! exec "'b+," .end_line_nbr. 's/^\s*/-@-'
+                silent! exec ''.(markb+1)."," .end_line_nbr. 's/^\s*/-@-'
                 " silent! exec "'b+,'e-" . 's/\s*\(.*\)/-@-\1'
                 AlignCtrl Ip0P0rl:
                 " silent! 'b,'e-Align -@-
-                silent! exec "'b,".end_line_nbr.'Align -@-'
+                " silent! exec "'b,".end_line_nbr.'Align -@-'
+                silent! exec markb.",".end_line_nbr.'Align -@-'
                 " silent! 'b,'e-s/-@-/ /
                 if line =~? '^\s*\('.sql_keywords.'\)'
-                    silent! exec "'b,".end_line_nbr.'s/-@-/ /ge'
+                    silent! exec markb.",".end_line_nbr.'s/-@-/ /ge'
                 else
-                    silent! exec "'b,".end_line_nbr.'s/-@-/'.(g:sqlutil_align_comma == 1 ? ' ' : '' ).'/ge'
+                    silent! exec markb.",".end_line_nbr.'s/-@-/'.(g:sqlutil_align_comma == 1 ? ' ' : '' ).'/ge'
                 endif
                 AlignCtrl default
 
@@ -1184,10 +1214,54 @@ function! SQLU_CreateColumnList(...)
         let only_primary_key = 0
     endif
 
+    let add_alias = ''
+    if(a:0 > 2) 
+        let add_alias = a:2
+    else
+        if 'da' =~? g:sqlutil_use_tbl_alias
+            if table_name =~ '_'
+                " Treat _ as separators since people often use these
+                " for word separators
+                let save_keyword = &iskeyword
+                setlocal iskeyword-=_
+
+                " Get the first letter of each word
+                " [[:alpha:]] is used instead of \w 
+                " to catch extended accented characters
+                "
+                let initials = substitute( 
+                            \ table_name, 
+                            \ '\<[[:alpha:]]\+\>_\?', 
+                            \ '\=strpart(submatch(0), 0, 1)', 
+                            \ 'g'
+                            \ )
+                " Restore original value
+                let &iskeyword = save_keyword
+            elseif table_name =~ '\u\U'
+                let initials = substitute(
+                            \ table_name, '\(\u\)\U*', '\1', 'g')
+            else
+                let initials = strpart(table_name, 0, 1)
+            endif
+
+            if 'a' =~? g:sqlutil_use_tbl_alias
+                let add_alias = inputdialog("Enter table alias:", initials)
+            else
+                let add_alias = initials
+            endif
+        endif
+    endif
+    " Following a word character, make sure there is a . and no spaces
+    let add_alias = substitute(add_alias, '\w\zs\.\?\s*$', '.', '')
+
     " save previous search string
     let saveSearch = @/
     let saveZ      = @z
     let columns    = ""
+    " Prevent the alternate buffer (<C-^>) from being set to this
+    " temporary file
+    let l:old_cpoptions = &cpoptions
+    setlocal cpo-=A
     
     " ignore case
     if( only_primary_key == 0 )
@@ -1260,13 +1334,11 @@ function! SQLU_CreateColumnList(...)
                 " let cmd = 'silent! normal! V'."\n"
                 let find_end_of_cols = 
                             \ '\(' .
-                            \ ')\?\s*' . g:sqlutil_cmd_terminator .
+                            \ g:sqlutil_cmd_terminator .
+                            \ '\|' .
                             \ substitute(
                             \ g:sqlutil_col_list_terminators,
-                            \ '\s*\(\w\+\)\s*\%(,\)\?',
-                            \ '\\|\1',
-                            \ 'g'
-                            \ ) .
+                            \ ',', '\\|\1', 'g' ) .
                             \ '\)' 
                     
                 let separator = ""
@@ -1282,19 +1354,22 @@ function! SQLU_CreateColumnList(...)
                         continue
                     endif
 
+
                     " if any of the find_end_of_cols is found, leave this loop.
                     " This test is case insensitive.
-                    if line =~? find_end_of_cols
+                    if line =~? '^\s*\w\+\s\+\w\+\s\+'.find_end_of_cols
+                        " Special case, the column name definition
+                        " is part of the line
+                    elseif line =~? find_end_of_cols
                         let end_line = start_line - 1
                         break
                     endif
 
-                    " Decho line
                     let column_name = substitute( line, 
                                 \ '[ \t"]*\(\<\w\+\>\).*', '\1', "g" )
                     let column_def = SQLU_GetColumnDatatype( line, 1 )
 
-                    let columns = columns . separator . column_name
+                    let columns = columns . separator . add_alias . column_name
                     let separator  = ", "
                     let start_line = start_line + 1
                 endwhile
@@ -1347,12 +1422,16 @@ function! SQLU_CreateColumnList(...)
     silent! exec "buffer " . curbuf
 
     " Return to previous location
-    silent! exe 'norm! '.curline."G\<bar>".curcol."l"
+    silent! exe 'norm! '.curline."G\<bar>".(curcol-1).(((curcol-1) > 0)?"l":'')
     silent! exe 'noh'
 
     " restore previous search
     let @/ = saveSearch
     let @z = saveZ
+
+    " Restore previous cpoptions
+    let &cpoptions = l:old_cpoptions
+
 
     redraw
 
@@ -1538,6 +1617,11 @@ function! SQLU_CreateProcedure(...)
     let found       = 0
     " save previous search string
     let saveSearch=@/ 
+    " Prevent the alternate buffer (<C-^>) from being set to this
+    " temporary file
+    let l:old_cpoptions = &cpoptions
+    setlocal cpo-=A
+
     
 
     if(a:0 > 0) 
@@ -1597,13 +1681,11 @@ function! SQLU_CreateProcedure(...)
             " let cmd = 'silent! normal! V'."\n"
             let find_end_of_cols = 
                         \ '\(' .
-                        \ ')\?\s*' . g:sqlutil_cmd_terminator .
+                        \ g:sqlutil_cmd_terminator .
+                        \ '\|' .
                         \ substitute(
                         \ g:sqlutil_col_list_terminators,
-                        \ '\s*\(\w\+\)\s*\%(,\)\?',
-                        \ '\\|\1',
-                        \ 'g'
-                        \ ) .
+                        \ ',', '\\|\1', 'g' ) .
                         \ '\)' 
                 
             let separator = " "
@@ -1626,7 +1708,6 @@ function! SQLU_CreateProcedure(...)
                     break
                 endif
 
-                " Decho line
                 let column_name = substitute( line, 
                             \ '[ \t"]*\(\<\w\+\>\).*', '\1', "g" )
                 let column_def = SQLU_GetColumnDatatype( line, 1 )
@@ -1796,6 +1877,9 @@ function! SQLU_CreateProcedure(...)
 
     " restore previous search string
     let @/ = saveSearch
+    " Restore previous cpoptions
+    let &cpoptions = l:old_cpoptions
+
     
     " Return to previous location
     silent! exe 'norm! '.curline."G\<bar>".curcol."l"
