@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	  David Fishburn <fishburn@ianywhere.com>
 "   Date:	  Nov 23, 2002
-"   Last Changed: Thu Feb 10 2005 10:47:57 AM
-"   Version:	  1.3.9
+"   Last Changed: Sun Mar 13 2005 1:39:41 PM
+"   Version:	  1.4.0
 "   Script:	  http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -520,7 +520,7 @@ function! s:SQLU_ReformatStatement()
     "            union all
     let cmd = "'y+1,'z-1".'s/\%(^\s*\)\@<!\zs\<\(' .
                 \ sql_keywords .
-                \ '\)\>\s\+/' .
+                \ '\)\>\s*/' .
                 \ '\r\1' .
                 \ ( g:sqlutil_align_first_word==0 ? '-@-' : ' ' ) .
                 \ '/gei'
@@ -581,7 +581,7 @@ function! s:SQLU_ReformatStatement()
     silent! exec cmd
 
     if g:sqlutil_align_comma == 1 
-	call s:SQLU_WrapAtCommas()
+        call s:SQLU_WrapAtCommas()
     endif
 
     call s:SQLU_WrapFunctionCalls()
@@ -687,6 +687,10 @@ function! s:SQLU_IndentNestedBlocks()
     silent! exe 'norm! '.linenum."G\<bar>0\<bar>"
 
     while( search( begin_case, 'W' ) > 0 )
+        " Check to see if the CASE statement is inside a string
+        if synID(line("."),col("."),1) > 0
+            continue
+        endif
         let curline = line(".")
         if( (curline < line("'y+1"))  || (curline > line("'z-1" )) )
             " echom 'No case statements, leaving loop'
@@ -760,7 +764,7 @@ function! s:SQLU_IndentNestedCase( begin_case, start_line, end_line )
 
     if( (end_of_prev_case < a:start_line) || (end_of_prev_case > a:end_line) )
         call s:SQLU_WarningMsg(
-                    \ 'No matching end case for: ' .
+                    \ 'SQLU_IndentNestedCase - No matching end case for: ' .
                     \ getline((linenum-1))
                     \ )
         return -1
@@ -843,7 +847,7 @@ function! s:SQLU_WrapFunctionCalls()
                 break
             endif
 
-            let prev_func_call = 0
+            let prev_func_call = func_call
 
             " Position cursor at func_call
             silent! exe 'norm! '.linenum."G\<bar>".func_call."l"
@@ -855,57 +859,63 @@ function! s:SQLU_WrapFunctionCalls()
                 let linenum = linenum + 1
                 break
             endif
-            let end_paran = searchpair( '(', '', ')', '' )
-            if end_paran < linenum || end_paran > linenum
-                " call s:SQLU_WarningMsg(
-                "             \ 'SQLU_WrapFunctionCalls - ' . 
-                "             \ 'should have found a matching ) for :' .
-                "             \ getline(linenum)
-                "             \ )
-                let linenum = linenum + 1
-                break
-            endif
 
-            let prev_func_call = func_call
-
-            " If the matching ) is past the textwidth
-            if virtcol(".") > line_textwidth
-                if (virtcol(".")-func_call) > line_textwidth
-                    " Place the closing brace on a new line only if
-                    " the entire length of the function call and 
-                    " parameters is longer than a line
-                    silent! exe "norm! i\r-@-\<esc>"
-                endif
-                " If the SQL keyword preceeds the function name dont
-                " bother placing it on a new line
-                let preceeded_by_keyword = 
-                            \ '^\s*' .
-                            \ '\(' .
-                            \ sql_keywords .
-                            \ '\|,' .
-                            \ '\)' .
-                            \ '\(-@-\)\?' .
-                            \ '\s*' .
-                            \ '\%'.(func_call+1).'c'
-                " echom 'preceeded_by_keyword: '.preceeded_by_keyword
-                " echom 'func_call:'.func_call.' Current 
-                " character:"'.getline(linenum)[virtcol(func_call)].'"  - 
-                " '.getline(linenum)
-                if getline(linenum) !~? preceeded_by_keyword
-                    " if line =~? '^\s*\('.sql_keywords.'\)'
-                    " Place the function name on a new line
-                    silent! exe linenum.'s/\%'.(func_call+1).'c/\r-@-'
+            " Check to ensure the paran is not part of a string
+            " Otherwise ignore and move on to the next paran
+            if synID(line("."),col("."),1) == 0
+                " let end_paran = searchpair( '(', '', ')', '' )
+                " Ignore parans that are inside of strings
+                let end_paran = searchpair( '(', '', ')', '',
+                            \ 'synID(line("."),col("."),1)>0' )
+                if end_paran < linenum || end_paran > linenum
+                    " call s:SQLU_WarningMsg(
+                    "             \ 'SQLU_WrapFunctionCalls - ' . 
+                    "             \ 'should have found a matching ) for :' .
+                    "             \ getline(linenum)
+                    "             \ )
                     let linenum = linenum + 1
-                    " These lines will be indented since they are wrapped
-                    " in parantheses.  Decrease the line_textwidth by
-                    " that amount to determine where to split nested 
-                    " function calls
-                    let line_textwidth = line_textwidth - (2 * &shiftwidth)
-                    let func_call = 0
-                    " Get the new offset of this function from the start
-                    " of the newline it is on
-                    let prev_func_call = match(
-                                \ getline(linenum),get_func_nm,func_call)
+                    break
+                endif
+
+                " If the matching ) is past the textwidth
+                if virtcol(".") > line_textwidth
+                    if (virtcol(".")-func_call) > line_textwidth
+                        " Place the closing brace on a new line only if
+                        " the entire length of the function call and 
+                        " parameters is longer than a line
+                        silent! exe "norm! i\r-@-\<esc>"
+                    endif
+                    " If the SQL keyword preceeds the function name dont
+                    " bother placing it on a new line
+                    let preceeded_by_keyword = 
+                                \ '^\s*' .
+                                \ '\(' .
+                                \ sql_keywords .
+                                \ '\|,' .
+                                \ '\)' .
+                                \ '\(-@-\)\?' .
+                                \ '\s*' .
+                                \ '\%'.(func_call+1).'c'
+                    " echom 'preceeded_by_keyword: '.preceeded_by_keyword
+                    " echom 'func_call:'.func_call.' Current 
+                    " character:"'.getline(linenum)[virtcol(func_call)].'"  - 
+                    " '.getline(linenum)
+                    if getline(linenum) !~? preceeded_by_keyword
+                        " if line =~? '^\s*\('.sql_keywords.'\)'
+                        " Place the function name on a new line
+                        silent! exe linenum.'s/\%'.(func_call+1).'c/\r-@-'
+                        let linenum = linenum + 1
+                        " These lines will be indented since they are wrapped
+                        " in parantheses.  Decrease the line_textwidth by
+                        " that amount to determine where to split nested 
+                        " function calls
+                        let line_textwidth = line_textwidth - (2 * &shiftwidth)
+                        let func_call = 0
+                        " Get the new offset of this function from the start
+                        " of the newline it is on
+                        let prev_func_call = match(
+                                    \ getline(linenum),get_func_nm,func_call)
+                    endif
                 endif
             endif
 
@@ -941,7 +951,7 @@ function! s:SQLU_WrapAtCommas()
         let line = getline(linenum)
         " if line =~? '^\s*\('.sql_keywords.'\)'
         if line =~? '\w'
-            if line =~? '^\s*\<\('.sql_keywords.'\)\>'
+            " if line =~? '^\s*\<\('.sql_keywords.'\)\>'
                 silent! exec linenum 
                 " Mark the start of the line
                 silent! exec "normal mb"
@@ -955,20 +965,29 @@ function! s:SQLU_WrapAtCommas()
                     " Go to character
                     call cursor(linenum, (index+1))
 
-                    if getline(linenum)[col(".")-1] == '('
-                        if searchpair( '(', '', ')', '' ) > 0
+                    " Make sure the paran is not a string
+                    if getline(linenum)[col(".")-1] == '(' &&
+                                \ synID(line("."),col("."),1) == 0
+                        " if searchpair( '(', '', ')', '' ) > 0
+                        " Ignore parans that are inside of strings
+                        if searchpair( '(', '', ')', '',
+                                    \ 'synID(line("."),col("."),1)>0' ) > 0
                             let linenum = line(".")
                             let index   = col(".")
                         endif
                     else
-                        " Given the current cursor position, replace
-                        " the , and any following whitespace
-                        " with a newline and the special -@- character
-                        " for Align
-                        silent! exec linenum . ',' . linenum . 
-                                    \ 's/\%' . (index + 1) . 'c,\s*' .
-                                    \ '/\r,-@-'
-                        let linenum = linenum + 1
+                        " Only do this if the comma at this offset
+                        " is not already at the start of the line
+                        if match(getline(linenum), '\S') != index
+                            " Given the current cursor position, replace
+                            " the , and any following whitespace
+                            " with a newline and the special -@- character
+                            " for Align
+                            silent! exec linenum . ',' . linenum . 
+                                        \ 's/\%' . (index + 1) . 'c,\s*' .
+                                        \ '/\r,-@-'
+                            let linenum = linenum + 1
+                        endif
                         " Find the index of the first non-white space
                         " which should be the , we just put on the 
                         " newline
@@ -986,7 +1005,8 @@ function! s:SQLU_WrapAtCommas()
 
                 " Go to the end of the new lines
                 silent! exec "'e-" 
-            endif
+                let linenum = line("'e")-1
+            " endif
         endif
 
         let linenum = linenum + 1
@@ -1156,6 +1176,13 @@ function! s:SQLU_SplitUnbalParan()
 
         let begin_paran = match( line, "(" )
         while begin_paran > -1
+            " Check if the paran is inside a string
+            if synID(linenum,(begin_paran+1),1) > 0
+                " If it is, skip to the next paran
+                let begin_paran = match( getline(linenum), "(", (begin_paran+1) )
+                continue
+            endif
+
             " let curcol      = begin_paran + 1
             let curcol      = begin_paran
             " echom 'begin_paran: '.begin_paran.
@@ -1165,17 +1192,23 @@ function! s:SQLU_SplitUnbalParan()
 
             " Place the cursor on the (
              "silent! exe 'norm! '.linenum."G\<bar>".(curcol-1)."l"
-            silent! exe 'norm! '.linenum."G\<bar>".curcol."l"
+            " silent! exe 'norm! '.linenum."G\<bar>".curcol."l"
+            call cursor(linenum,(curcol+1))
 
+            " let indent_to = searchpair( '(', '', ')', '' )
             " Find the matching closing )
-            let indent_to = searchpair( '(', '', ')', '' )
+            " Ignore parans that are inside of strings
+            let indent_to = searchpair( '(', '', ')', 'W',
+                        \ 'synID(line("."),col("."),1)>0' )
 
             " If the match is outside of the range, this is an unmatched (
             if indent_to < 1 || indent_to > line("'z-1")
                 " Return to previous location
                 " echom 'Unmatched parentheses on line: ' . getline(linenum)
                 call s:SQLU_WarningMsg(
-                            \ 'Unmatched parentheses on line: ' . 
+                            \ 'SQLU_SplitUnbalParan: Unmatched parentheses' .
+                            \ ' at line/col: (' . (linenum-1).','.(curcol+1). 
+                            \ ') on line: ' . 
                             \ getline(linenum)
                             \ )
                 " echom 'Unmatched parentheses: Returning to: '.
