@@ -1,0 +1,271 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=492
+
+Various SQL Utilities.
+
+Version 2.0 requires Vim 7.
+
+1. A SQL formatter, to make SQL statements (select, insert, update, delete...) more readable.   
+2. Based on create table statements, will generate select lists for a table, as long as the definition exists in some open buffer.
+3. Creates a generic procedure that will perform an insert, update, delete and select based on the definition of a table (if already open in some buffer).  The format is ANSI.
+4.  Returns the column datatype definition for a specified column name (or supplied) based on the definition of a table (if already open in some buffer).
+
+Functions:
+[range]SQLUFormatter(..list..)
+                                                                            
+     Formats SQL statements into a easily readable form.
+     Breaks keywords onto new lines.
+     Forces column lists to be split over as many lines as
+     necessary to fit the current textwidth of the buffer,
+     so that lines do not wrap.
+     If parentheses are unbalanced (ie a subselect) it will
+     indent everything within the unbalanced paranthesis.
+     Works for SELECT, INSERT, UPDATE, DELETE statements.
+
+     Global variables to customization some aspects of the formatting:
+     sqlutil_align_where - aligns the =, >=, <=, ...
+     sqlutil_align_comma - places the column lists in select statement on new lines
+     sqlutil_align_first_word - see examples
+
+     You can change the case of the keywords while formatting.
+
+                                                                            
+Examples (these would look much better when using a fixed font):
+                                                                            
+  Original:
+  SELECT m.MSG_ID, m.PRIORITY_ID, CUST.CUST_NBR, CUST.CUST_NM, 
+  CUST.CUST_LEGAL_NM, CUST.STORE_ADDR_1, CUST.STORE_ADDR_2, 
+  CUST.CROSS_STREET, XMLELEMENT( 'Alerts', XMLELEMENT( 'Alert_alert_id', 
+  alert_id ), XMLELEMENT( 'Alert_agent_id', agent_id ), XMLELEMENT( 
+  'Alert_alert_type_id', alert_type_desc), XMLELEMENT( 
+  'Alert_alert_date', alert_date), XMLELEMENT( 
+  'Alert_url_reference', url_reference), XMLELEMENT( 
+  'Alert_read_status', read_status )) CUST.STORE_CITY, 
+  CUST.STORE_ST, CUST.POST_CODE, CUST.STORE_MGR_NM, FROM MESSAGES m JOIN 
+  PRIORITY_CD P WHERE m.to_person_id = ?  AND p.NAME = 'PRI_EMERGENCY' AND 
+  p.JOB = 'Plumber' AND m.status_id < ( SELECT s.STATUS_ID FROM 
+  MSG_STATUS_CD s WHERE s.NAME = 'MSG_READ') ORDER BY m.msg_id desc
+  
+                                                                            
+  Formatted:
+  SELECT m.MSG_ID, m.PRIORITY_ID, CUST.CUST_NBR, CUST.CUST_NM,
+         CUST.CUST_LEGAL_NM, CUST.STORE_ADDR_1, CUST.STORE_ADDR_2,
+         CUST.CROSS_STREET,
+         XMLELEMENT(
+             'Alerts', XMLELEMENT( 'Alert_alert_id', alert_id ),
+             XMLELEMENT( 'Alert_agent_id', agent_id ),
+             XMLELEMENT( 'Alert_alert_type_id', alert_type_desc),
+             XMLELEMENT( 'Alert_alert_date', alert_date),
+             XMLELEMENT(
+                 'Alert_url_reference', url_reference
+              ), XMLELEMENT( 'Alert_read_status', read_status )
+         ) CUST.STORE_CITY, CUST.STORE_ST, CUST.POST_CODE, 
+         CUST.STORE_MGR_NM
+    FROM MESSAGES m
+    JOIN PRIORITY_CD P
+   WHERE m.to_person_id = ?
+     AND p.NAME = 'PRI_EMERGENCY'
+     AND p.JOB = 'Plumber'
+     AND m.status_id < (
+          SELECT s.STATUS_ID
+            FROM MSG_STATUS_CD s
+           WHERE s.NAME = 'MSG_READ'
+         )
+   ORDER BY m.msg_id desc
+  
+  
+                                                                            
+  Original:
+  UPDATE "SERVICE_REQUEST" SET "BUILDING_ID" = ?, "UNIT_ID" = ?, 
+  "REASON_ID" = ?, "PERSON_ID" = ?, "PRIORITY_ID" = ?, "STATUS_ID" = ?, 
+  "CREATED" = ?, "REQUESTED" = ?, "ARRIVED" = ?  WHERE "REQUEST_ID" = ?
+                                                                            
+                                                                            
+  Formatted:
+  UPDATE "SERVICE_REQUEST"
+     SET "BUILDING_ID" = ?,
+         "UNIT_ID" = ?,
+         "REASON_ID" = ?,
+         "PERSON_ID" = ?,
+         "PRIORITY_ID" = ?,
+         "STATUS_ID" = ?,
+         "CREATED" = ?,
+         "REQUESTED" = ?,
+         "ARRIVED" = ?,
+   WHERE "REQUEST_ID"  = ?
+                                                                            
+                                                                            
+                                                                            
+  Original:
+  INSERT INTO "MESSAGES" ( "MSG_ID", "TO_PERSON_ID", 
+  "FROM_PERSON_ID", "REQUEST_ID", "CREATED", "PRIORITY_ID", 
+  "MSG_TYPE_ID", "STATUS_ID", "READ_WHEN", "TIMEOUT", 
+  "MSG_TXT", "RESEND_COUNT" ) VALUES ( ?, ?, ?, 
+  ?, ?, ?, ?, ?, ?, ?, ?, ? )
+                                                                            
+                                                                            
+  Formatted:
+  INSERT INTO "MESSAGES" ( "MSG_ID", "TO_PERSON_ID",
+         "FROM_PERSON_ID", "REQUEST_ID", "CREATED",
+         "PRIORITY_ID", "MSG_TYPE_ID", "STATUS_ID",
+         "READ_WHEN", "TIMEOUT", "MSG_TXT", "RESEND_COUNT" )
+  VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
+                                                                            
+                                                                            
+Functions:
+SQLUCreateColumnList( optional parameter )
+                                                                            
+     Assumes either the current file, or any other open buffer, 
+     has a CREATE TABLE statement in a format similar to this:
+     CREATE TABLE customer (
+     	id	INT DEFAULT AUTOINCREMENT,
+     	last_modified TIMESTAMP NULL,
+     	first_name     	VARCHAR(30) NOT NULL,
+     	last_name	VARCHAR(60) NOT NULL,
+     	balance	        NUMERIC(10,2),
+     	PRIMARY KEY( id )
+     );
+     If you place the cursor on the word customer, then the 
+     unnamed buffer (also displayed by an echo statement) will 
+     contain:
+     id, last_modified, first_name, last_name, balance
+                                                                            
+     Optionally, it will replace the word with the above and place
+     the word in the unnamed buffer.  Calling the function with
+     a parameter enables this feature.
+                                                                            
+     This also uses the g:sqlutil_cmd_terminator to determine when
+     the create table statement ends if none of the following terms
+     are found before the final );
+            primary,reference,unique,check,foreign
+     sqlutil_cmd defaults to ";"
+                                                                            
+                                                                            
+Functions:
+SQLUGetColumnDef( optional parameter )
+SQLUGetColumnDataType( expand("<cword>"), 1 )
+                                                                            
+     Assumes either the current file, or any other open buffer, 
+     has a CREATE TABLE statement in a format similar to this:
+     CREATE TABLE customer (
+     	id	INT DEFAULT AUTOINCREMENT,
+     	last_modified TIMESTAMP NULL,
+     	first_name     	VARCHAR(30) NOT NULL,
+     	last_name	VARCHAR(60) NOT NULL,
+     	balance	        NUMERIC(10,2),
+     	PRIMARY KEY( id )
+     );
+     If you place the cursor on the word first_name, then the 
+     column definition will be placed in the unnamed buffer (and also
+     displayed by an echo statement).
+     VARCHAR(30) NOT NULL        
+                                                                            
+     If the command is called as SQLUGetColumnDef( expand("<cword>"), 1 )
+     or using the default mapping \scdt, just the datatype (instead
+     of the column definition) will be returned.  A separate command 
+     SQLUGetColumnDataType has been created for this.
+     VARCHAR(30) 
+                                                                            
+                                                                            
+Functions:
+SQLUCreateProcedure()
+                                                                            
+     Assumes either the current file, or any other open buffer, 
+     has a CREATE TABLE statement in a format similar to this:
+     CREATE TABLE customer (
+     	id	        INT DEFAULT AUTOINCREMENT,
+     	last_modified   TIMESTAMP NULL,
+     	first_name     	VARCHAR(30) NOT NULL,
+     	last_name	VARCHAR(60) NOT NULL,
+     	balance	        NUMERIC(10,2),
+     	PRIMARY KEY( id )
+     );
+     By calling SQLUCreateProcedure while on the name of a table
+     the unnamed buffer will contain the create procedure statement
+     for insert, update, delete and select statements.
+     Once pasted into the buffer, unneeded functionality can be 
+     removed.
+                                                                            
+                                                                            
+                                                                            
+Commands:
+[range]SQLUFormatter ..list..    
+                     : Reformats the SQL statements over the specified 
+                       range.  Statement will lined up given the 
+                       existing indent of the first word.
+SQLUCreateColumnList:  Creates a comma separated list of column names
+                       for the table name under the cursor, assuming
+                       the table definition exists in any open 
+                       buffer.  The column list is placed in the unnamed
+                       buffer.
+                       This also uses the g:sqlutil_cmd_terminator.
+                       By default a table alias will be added to each of the columns, this is 
+                       configurable, see documentation (new 1.3.7).
+                       This routine can optionally take 2 parameters
+                       SQLUCreateColumnList T1 
+                           Creates a column list for T1
+                       SQLUCreateColumnList T1 1
+                           Creates a column list for T1 but only for
+                           the primary keys for that table.
+SQLUGetColumnDef     : Displays the column definition of the column name
+                       under the cursor.  It assumes the CREATE TABLE
+                       statement is in an open buffer.
+SQLUGetColumnDataType
+                     : Displays the column datatype of the column name
+                       under the cursor.  It assumes the CREATE TABLE
+                       statement is in an open buffer.
+SQLUCreateProcedure  : Creates a stored procedure to perform standard
+                       operations against the table that the cursor
+                       is currently under.
+                       
+                                                                            
+
+Suggested Mappings:
+    vmap <silent>sf        <Plug>SQLU_Formatter<CR>
+    nmap <silent>scl       <Plug>SQLU_CreateColumnList<CR>
+    nmap <silent>scd       <Plug>SQLU_GetColumnDef<CR>
+    nmap <silent>scdt      <Plug>SQLU_GetColumnDataType<CR>
+    nmap <silent>scp       <Plug>SQLU_CreateProcedure<CR>
+                                                                            
+    mnemonic explanation
+    s - sql
+      f   - format
+      cl  - column list
+      cd  - column definition
+      cdt - column datatype
+      cp  - create procedure
+                                                                            
+    To prevent the default mappings from being created, place the 
+    following in your _vimrc:
+        let g:sqlutil_load_default_maps = 0
+                                                                            
+Customization:
+    By default this script assumes a command is terminated by a ;
+    If you are using Microsoft SQL Server a command terminator 
+    would be "go", or perhaps "\ngo".
+    To permenantly override the terminator in your _vimrc file you can add
+          let g:sqlutil_cmd_terminator = "\ngo"
+                                                                            
+                                                                            
+    When building a column list from a script file (ie CREATE TABLE 
+    statements), you can customize the script to detect when the 
+    column list finishes by creating the following in your _vimrc:
+          let g:sqlutil_col_list_terminators = 
+                       \ 'primary,reference,unique,check,foreign'
+                                                                            
+    This can be necessary in the following example:
+          CREATE TABLE customer (
+             id         INT DEFAULT AUTOINCREMENT,
+             first_name VARCHAR(30) NOT NULL,
+             last_name  VARCHAR(60) NOT NULL,
+             PRIMARY KEY( id )
+          ); 
+
+Dependencies:
+       Align.vim - Version 15
+                        - Author: Charles E. Campbell, Jr.
+                        - http://www.vim.org/script.php?script_id=294
+
+Suggested (Complementary) Plugins:
+     dbext.vim - Author: Peter Bagyinszki and David Fishburn
+                - http://www.vim.org/script.php?script_id=356
+
