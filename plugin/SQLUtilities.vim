@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
-"   Author:	  David Fishburn <fishburn@sybase.com>
+"   Author:	  David Fishburn <fishburn@ianywhere.com>
 "   Date:	  Nov 23, 2002
-"   Last Changed: Fri Jun 06 2003 03:06:44
-"   Version:	  1.3
+"   Last Changed: Fri Sep 05 2003 2:05:33 PM
+"   Version:	  1.3.3
 "   Script:	  http://www.vim.org/script.php?script_id=492
 "
 "   Dependencies:
@@ -10,8 +10,12 @@
 "                  - Author: Charles E. Campbell, Jr.
 "                  - http://www.vim.org/script.php?script_id=294
 "
+"   Suggested (Complementary) Plugins:
+"        db_ext.vim - Author: Peter Bagyinszki and David Fishburn
+"                   - http://www.vim.org/script.php?script_id=356
+"
 "   Functions:
-"   [range]SQLFormatter(..list..)
+"   [range]SQLUFormatter(..list..)
 "
 "        Formats SQL statements into a easily readable form.
 "        Breaks keywords onto new lines.
@@ -105,7 +109,7 @@
 "
 "
 "   Functions:
-"   CreateColumnList( optional parameter )
+"   SQLUCreateColumnList( optional parameter )
 "
 "        Assumes either the current file, or any other open buffer, 
 "        has a CREATE TABLE statement in a format similar to this:
@@ -134,8 +138,8 @@
 "
 "
 "   Functions:
-"   GetColumnDef( optional parameter )
-"   GetColumnDataType( expand("<cword>"), 1 )
+"   SQLUGetColumnDef( optional parameter )
+"   SQLUGetColumnDataType( expand("<cword>"), 1 )
 "
 "        Assumes either the current file, or any other open buffer, 
 "        has a CREATE TABLE statement in a format similar to this:
@@ -152,15 +156,15 @@
 "        displayed by an echo statement).
 "        VARCHAR(30) NOT NULL        
 "
-"        If the command is called as GetColumnDef( expand("<cword>"), 1 )
+"        If the command is called as SQLUGetColumnDef( expand("<cword>"), 1 )
 "        or using the default mapping \scdt, just the datatype (instead
 "        of the column definition) will be returned.  A separate command 
-"        GetColumnDataType has been created for this.
+"        SQLUGetColumnDataType has been created for this.
 "        VARCHAR(30) 
 "
 "
 "   Functions:
-"   CreateProcedure()
+"   SQLUCreateProcedure()
 "
 "        Assumes either the current file, or any other open buffer, 
 "        has a CREATE TABLE statement in a format similar to this:
@@ -172,7 +176,7 @@
 "        	balance	        NUMERIC(10,2),
 "        	PRIMARY KEY( id )
 "        );
-"        By calling CreateProcedure while on the name of a table
+"        By calling SQLUCreateProcedure while on the name of a table
 "        the unnamed buffer will contain the create procedure statement
 "        for insert, update, delete and select statements.
 "        Once pasted into the buffer, unneeded functionality can be 
@@ -181,40 +185,41 @@
 "
 "
 "   Commands:
-"   [range]SQLFormatter ..list..    
+"   [range]SQLUFormatter ..list..    
 "                        : Reformats the SQL statements over the specified 
 "                          range.  Statement will lined up given the 
 "                          existing indent of the first word.
-"   CreateColumnList     : Creates a comma separated list of column names
+"   SQLUCreateColumnList:  Creates a comma separated list of column names
 "                          for the table name under the cursor, assuming
 "                          the table definition exists in any open 
 "                          buffer.  The column list is placed in the unnamed
 "                          buffer.
 "                          This also uses the g:sqlutil_cmd_terminator
 "                          This routine can optionally take 2 parameters
-"                          CreateColumnList T1 
+"                          SQLUCreateColumnList T1 
 "                              Creates a column list for T1
-"                          CreateColumnList T1 1
+"                          SQLUCreateColumnList T1 1
 "                              Creates a column list for T1 but only for
 "                              the primary keys for that table.
-"   GetColumnDef         : Displays the column definition of the column name
+"   SQLUGetColumnDef     : Displays the column definition of the column name
 "                          under the cursor.  It assumes the CREATE TABLE
 "                          statement is in an open buffer.
-"   GetColumnDataType    : Displays the column datatype of the column name
+"   SQLUGetColumnDataType
+"                        : Displays the column datatype of the column name
 "                          under the cursor.  It assumes the CREATE TABLE
 "                          statement is in an open buffer.
-"   CreateProcedure      : Creates a stored procedure to perform standard
+"   SQLUCreateProcedure  : Creates a stored procedure to perform standard
 "                          operations against the table that the cursor
 "                          is currently under.
 "                          
 "
 "   
 "   Suggested Mappings:
-"       vmap <silent>sf        <Plug>SQLFormatter<CR>
-"       nmap <silent>scl       <Plug>CreateColumnList<CR>
-"       nmap <silent>scd       <Plug>GetColumnDef<CR>
-"       nmap <silent>scdt      <Plug>GetColumnDataType<CR>
-"       nmap <silent>scp       <Plug>CreateProcedure<CR>
+"       vmap <silent>sf        <Plug>SQLU_Formatter<CR>
+"       nmap <silent>scl       <Plug>SQLU_CreateColumnList<CR>
+"       nmap <silent>scd       <Plug>SQLU_GetColumnDef<CR>
+"       nmap <silent>scdt      <Plug>SQLU_GetColumnDataType<CR>
+"       nmap <silent>scp       <Plug>SQLU_CreateProcedure<CR>
 "
 "       mnemonic explanation
 "       s - sql
@@ -228,12 +233,43 @@
 "       following in your _vimrc:
 "           let g:sqlutil_load_default_maps = 0
 "
+"   Customization:
+"       By default this script assumes a command is terminated by a ;
+"       If you are using Microsoft SQL Server a command terminator 
+"       would be "go", or perhaps "\ngo".
+"       To permenantly override the terminator in your _vimrc file you can add
+"             let g:sqlutil_cmd_terminator = "\ngo"
+"
+"
+"       When building a column list from a script file (ie CREATE TABLE 
+"       statements), you can customize the script to detect when the 
+"       column list finishes by creating the following in your _vimrc:
+"             let g:sqlutil_col_list_terminators = 
+"                          \ 'primary,reference,unique,check,foreign'
+
+"       This can be necessary in the following example:
+"             CREATE TABLE customer (
+"                id         INT DEFAULT AUTOINCREMENT,
+"                first_name VARCHAR(30) NOT NULL,
+"                last_name  VARCHAR(60) NOT NULL,
+"                PRIMARY KEY( id )
+"             ); 
+"
+"
 "   TODO:
 "     1. Suggestions welcome
 "
 "
 "   History:
-"     1.3  : Mar 30, 2002: NF: Support the formatting of FUNCTIONS or
+"     1.3.3: Sep 05, 2003: NF: Added global variable 
+"                              sqlutil_col_list_terminators for 
+"                              customization.
+"     1.3.2: Aug 24, 2003: NF: Changed all functions to be prefixed by
+"                              SQLU_ for consistency.
+"                          BF: Fixed SQLU_GetColumnDataType and 
+"                              SQLU_GetColumnDef to handle tabs.
+"     1.3.1: Aug 21, 2003: BF: -@- could be left after incorrect formatting.
+"     1.3  : Mar 30, 2003: NF: Support the formatting of FUNCTIONS or
 "                              stored procedures used as derived tables.  This 
 "                              will nest the function calls on new lines and 
 "                              correctly split the paranthesis on new lines if 
@@ -242,7 +278,7 @@
 "                              column list.
 "                          NF: Support the formatting of nested CASE
 "                              statements.
-"                          NF: Added the GetColumnDataType command 
+"                          NF: Added the SQLU_GetColumnDataType command. 
 "                          NF: Improved primary key determination, it no 
 "                              longer requires the PRIMARY KEY statement to
 "                              be part of the CREATE TABLE statement, it can 
@@ -250,7 +286,7 @@
 "                          NF: Improved formatting of SQL keywords.  
 "                              INSERT INTO statement, the INTO will no longer
 "                              be split onto a new line.
-"                              Now correctly format the various JOIN keywords:
+"                          NF: Now correctly format the various JOIN keywords:
 "                              NATURAL RIGHT OUTER JOIN will be placed one
 "                              online instead of just the JOIN keyword as
 "                              before.
@@ -259,7 +295,6 @@
 "                          BF: Using new technique to determine how to change
 "                              the textwidth to utilitize more screen space
 "                              when wrapping long lines.
-"                              nested open paranthesis in all cases.
 "     1.2  : Nov 30, 2002: NF: Create procedure uses shiftwidth for indent.
 "                          BF: Save/restore previous search.
 "     1.0  : Nov 13, 2002: NF: Initial version.
@@ -275,71 +310,97 @@ if !exists('g:sqlutil_cmd_terminator')
     let g:sqlutil_cmd_terminator = ';'
 endif
 
+if !exists('g:sqlutil_col_list_terminators')
+    " You can override which keywords will determine
+    " when a column list finishes:
+    "        CREATE TABLE customer (
+    "        	id	INT DEFAULT AUTOINCREMENT,
+    "        	last_modified TIMESTAMP NULL,
+    "        	first_name     	VARCHAR(30) NOT NULL,
+    "        	last_name	VARCHAR(60) NOT NULL,
+    "        	balance	        NUMERIC(10,2),
+    "        	PRIMARY KEY( id )
+    "        );
+    " So in the above example, when "primary" is reached, we
+    " know the column list is complete.
+    let g:sqlutil_col_list_terminators = 
+                \ 'primary'    " PRIMARY KEY
+                \ ',reference' " foreign keys
+                \ ',unique'    " indicies
+                \ ',check'     " check contraints
+                \ ',foreign'   " foreign keys
+endif
+
 " Public Interface:
-com! -range -nargs=* SQLFormatter 
-            \          <line1>,<line2> call s:SQLFormatter(<f-args>)
-com!        -nargs=* CreateColumnList  call CreateColumnList(<f-args>)
-com!        -nargs=* GetColumnDef      call GetColumnDef(<f-args>)
-com!        -nargs=* GetColumnDataType call GetColumnDef(expand("<cword>"), 1)
-com!        -nargs=* CreateProcedure   call CreateProcedure(<f-args>)
+command! -range -nargs=* SQLUFormatter <line1>,<line2> 
+            \ call s:SQLU_Formatter(<f-args>)
+command!        -nargs=* SQLUCreateColumnList  
+            \ call SQLU_CreateColumnList(<f-args>)
+command!        -nargs=* SQLUGetColumnDef 
+            \ call SQLU_GetColumnDef(<f-args>)
+command!        -nargs=* SQLUGetColumnDataType 
+            \ call SQLU_GetColumnDef(expand("<cword>"), 1)
+command!        -nargs=* SQLUCreateProcedure 
+            \ call SQLU_CreateProcedure(<f-args>)
 
 if !exists("g:sqlutil_load_default_maps")
     let g:sqlutil_load_default_maps = 1
 endif 
 
 if(g:sqlutil_load_default_maps == 1)
-    if !hasmapto('<Plug>SQLFormatter')
-        vmap <unique> <Leader>sf <Plug>SQLFormatter
+    if !hasmapto('<Plug>SQLUFormatter')
+        vmap <unique> <Leader>sf <Plug>SQLUFormatter
     endif 
-    if !hasmapto('<Plug>CreateColumnList')
-        map <unique> <Leader>scl <Plug>CreateColumnList
+    if !hasmapto('<Plug>SQLUCreateColumnList')
+        map <unique> <Leader>scl <Plug>SQLUCreateColumnList
     endif 
-    if !hasmapto('<Plug>GetColumnDef')
-        map <unique> <Leader>scd <Plug>GetColumnDef
+    if !hasmapto('<Plug>SQLUGetColumnDef')
+        map <unique> <Leader>scd <Plug>SQLUGetColumnDef
     endif 
-    if !hasmapto('<Plug>GetColumnDataType')
-        map <unique> <Leader>scdt <Plug>GetColumnDataType
+    if !hasmapto('<Plug>SQLUGetColumnDataType')
+        map <unique> <Leader>scdt <Plug>SQLUGetColumnDataType
     endif 
-    if !hasmapto('<Plug>CreateProcedure')
-        map <unique> <Leader>scp <Plug>CreateProcedure
+    if !hasmapto('<Plug>SQLUCreateProcedure')
+        map <unique> <Leader>scp <Plug>SQLUCreateProcedure
     endif 
 endif 
 
 if exists("g:loaded_sqlutilities_global_maps")
-    vunmap <unique> <script> <Plug>SQLFormatter
-    nunmap <unique> <script> <Plug>CreateColumnList
-    nunmap <unique> <script> <Plug>GetColumnDef
-    nunmap <unique> <script> <Plug>GetColumnDataType
-    nunmap <unique> <script> <Plug>CreateProcedure
+    vunmap <unique> <script> <Plug>SQLUFormatter
+    nunmap <unique> <script> <Plug>SQLUCreateColumnList
+    nunmap <unique> <script> <Plug>SQLUGetColumnDef
+    nunmap <unique> <script> <Plug>SQLUGetColumnDataType
+    nunmap <unique> <script> <Plug>SQLUCreateProcedure
 endif
 
 " Global Maps:
-vmap <unique> <script> <Plug>SQLFormatter      :SQLFormatter<CR>
-nmap <unique> <script> <Plug>CreateColumnList  :CreateColumnList<CR>
-nmap <unique> <script> <Plug>GetColumnDef      :GetColumnDef<CR>
-nmap <unique> <script> <Plug>GetColumnDataType :GetColumnDataType<CR>
-nmap <unique> <script> <Plug>CreateProcedure   :CreateProcedure<CR>
+vmap <unique> <script> <Plug>SQLUFormatter         :SQLUFormatter<CR>
+nmap <unique> <script> <Plug>SQLUCreateColumnList  :SQLUCreateColumnList<CR>
+nmap <unique> <script> <Plug>SQLUGetColumnDef      :SQLUGetColumnDef<CR>
+nmap <unique> <script> <Plug>SQLUGetColumnDataType :SQLUGetColumnDataType<CR>
+nmap <unique> <script> <Plug>SQLUCreateProcedure   :SQLUCreateProcedure<CR>
 let g:loaded_sqlutilities_global_maps = 1
 
 if has("gui_running") && has("menu")
-    vnoremenu <script> Plugin.SQLUtil.Format\ Statement  :SQLFormatter<CR>
-    noremenu  <script> Plugin.SQLUtil.Format\ Statement  :SQLFormatter<CR>
-    noremenu  <script> Plugin.SQLUtil.Create\ Procedure  :CreateProcedure<CR>
+    vnoremenu <script> Plugin.SQLUtil.Format\ Statement :SQLUFormatter<CR>
+    noremenu  <script> Plugin.SQLUtil.Format\ Statement :SQLUFormatter<CR>
+    noremenu  <script> Plugin.SQLUtil.Create\ Procedure :SQLUCreateProcedure<CR>
     inoremenu <script> Plugin.SQLUtil.Create\ Procedure  
-                \ <C-O>:CreateProcedure<CR>
+                \ <C-O>:SQLUCreateProcedure<CR>
     noremenu  <script> Plugin.SQLUtil.Create\ Column\ List   
-                \ :CreateColumnList<CR>
+                \ :SQLUCreateColumnList<CR>
     inoremenu <script> Plugin.SQLUtil.Create\ Column\ List 
-                \ <C-O>:CreateColumnList<CR>
-    noremenu  <script> Plugin.SQLUtil.Column\ Definition :GetColumnDef<CR>
+                \ <C-O>:SQLUCreateColumnList<CR>
+    noremenu  <script> Plugin.SQLUtil.Column\ Definition 
+                \ :SQLUGetColumnDef<CR>
     inoremenu <script> Plugin.SQLUtil.Column\ Definition 
-                \ <C-O>:GetColumnDef<CR>
+                \ <C-O>:SQLUGetColumnDef<CR>
 endif
 
-" SQLFormatter: align selected text based on alignment pattern(s)
-function! s:SQLFormatter(...) range
-    " call Decho("SQLFormatter() {")
-    call s:WrapperStart( a:firstline, a:lastline )
+" SQLU_Formatter: align selected text based on alignment pattern(s)
+function! s:SQLU_Formatter(...) range
+    " call Decho("SQLU_Formatter() {")
+    call s:SQLU_WrapperStart( a:firstline, a:lastline )
     " Store pervious value of highlight search
     let hlsearch = &hlsearch
     let &hlsearch = 0
@@ -347,22 +408,28 @@ function! s:SQLFormatter(...) range
     " save previous search string
     let saveSearch = @/ 
 
+    " save previous format options and turn off automatic formating
+    let saveFormatOptions = &formatoptions
+    silent execute 'setlocal formatoptions-=a'
+
     " Use the mark locations instead of storing the line numbers
     " since these values can changes based on the reformatting 
     " of the lines
-    let ret = s:ReformatStatement()
-    " return
+    let ret = s:SQLU_ReformatStatement()
     if ret > -1
-        let ret = s:IndentNestedBlocks()
+        let ret = s:SQLU_IndentNestedBlocks()
         if ret > -1
-            let ret = s:WrapLongLines()
+            let ret = s:SQLU_WrapLongLines()
         endif
     endif
 
     " Restore default value
     " And restore cursor position
     let &hlsearch = hlsearch
-    call s:WrapperEnd()
+    call s:SQLU_WrapperEnd()
+
+    " restore previous format options 
+    let &formatoptions = saveFormatOptions 
 
     " restore previous search string
     let @/ = saveSearch
@@ -372,22 +439,22 @@ endfunction
 
 " This function will return a count of unmatched parenthesis
 " ie ( this ( funtion ) - will return 1 in this case
-function! s:CountUnbalancedParan( line, paran_to_check )
+function! s:SQLU_CountUnbalancedParan( line, paran_to_check )
     let l = a:line
     let lp = substitute(l, '[^(]', '', 'g')
     let l = a:line
     let rp = substitute(l, '[^)]', '', 'g')
 
     if a:paran_to_check =~ ')'
-        " echom 'CountUnbalancedParan ) returning: ' 
+        " echom 'SQLU_CountUnbalancedParan ) returning: ' 
         " \ . (strlen(rp) - strlen(lp))
         return (strlen(rp) - strlen(lp))
     elseif a:paran_to_check =~ '('
-        " echom 'CountUnbalancedParan ( returning: ' 
+        " echom 'SQLU_CountUnbalancedParan ( returning: ' 
         " \ . (strlen(lp) - strlen(rp))
         return (strlen(lp) - strlen(rp))
     else
-        " echom 'CountUnbalancedParan unknown paran to check: ' . 
+        " echom 'SQLU_CountUnbalancedParan unknown paran to check: ' . 
         " \ a:paran_to_check
         return 0
     endif
@@ -395,7 +462,7 @@ endfunction
 
 " WS: wrapper start (internal)   Creates guard lines,
 "     stores marks y and z, and saves search pattern
-function! s:WrapperStart( beginline, endline )
+function! s:SQLU_WrapperStart( beginline, endline )
     let b:curline     = line(".")
     let b:curcol      = virtcol(".")
     let b:keepsearch  = @/
@@ -416,7 +483,7 @@ function! s:WrapperStart( beginline, endline )
     let b:ch= &ch
     set ch=2
     silent! exec "norm! 'zk"
-    " echom 'WrapperStart'
+    " echom 'SQLU_WrapperStart'
     " echom 'y-1l: '.(line("'y")-1).' t: '.getline(line("'y")-1)
     " echom 'y: '.line("'y").' t: '.getline(line("'y"))
     " echom 'z: '.line("'z").' t: '.getline(line("'z"))
@@ -426,7 +493,7 @@ endfunction
 
 " WE: wrapper end (internal)   Removes guard lines,
 "     restores marks y and z, and restores search pattern
-function! s:WrapperEnd()
+function! s:SQLU_WrapperEnd()
     " Delete blanks lines added around the visually selected range
     silent! exe "norm! 'yjkdd'zdd"
     silent! exe "set ch=".b:ch
@@ -451,7 +518,7 @@ endfunction
 " 3. CASE statements are setup for alignment.
 " 4. Operators are lined up
 " 
-function! s:ReformatStatement()
+function! s:SQLU_ReformatStatement()
     " Remove any lines that have comments on them since the comments
     " could spill onto new lines and no longer have comment markers
     " which would result in syntax errors
@@ -525,7 +592,7 @@ function! s:ReformatStatement()
                 \ sql_join_operator . '\|' .
                 \ 'on\|where\|and\|or\|order by\|group by\|' .
                 \ 'having\|for\|insert\|union\|subscribe\|' .
-                \ 'intersect\|except\|with'
+                \ 'intersect\|except\|with\|window'
     let cmd = "'y+1,'z-1".'s/\%(^\s*\)\@<!\zs\<\(' .
                 \ sql_keywords .
                 \ '\)\>/\r\1/gei'
@@ -570,9 +637,9 @@ function! s:ReformatStatement()
     " -@- to align on this later
     " silent! 'y+1,'z-1s/^\(\s*\)\([a-zA-Z0-9_]*\) /\1\2-@-
 
-    call s:WrapFunctionCalls()
+    call s:SQLU_WrapFunctionCalls()
 
-    let ret = s:SplitUnbalParan()
+    let ret = s:SQLU_SplitUnbalParan()
     if ret < 0
         " Undo any changes made so far since an error occurred
         " silent! exec 'u'
@@ -607,7 +674,7 @@ endfunction
 
 " Check through the selected text for open ( and
 " indent if necessary
-function! s:IndentNestedBlocks()
+function! s:SQLU_IndentNestedBlocks()
 
     let org_textwidth = &textwidth
     if &textwidth == 0 
@@ -646,9 +713,9 @@ function! s:IndentNestedBlocks()
                 if getline(linenum+1) =~? '^\s*\('.sql_keywords.'\)'
                     silent! exe 'norm! .'
                 endif
-                " echom 'IndentNestedBlocks - from: ' . line("'<") . ' to: ' .
+                " echom 'SQLU_IndentNestedBlocks - from: '.line("'<").' to: ' .
                 "             \ line("'>") 
-                " echom 'IndentNestedBlocks - no match: ' . getline(linenum)
+                " echom 'SQLU_IndentNestedBlocks - no match: '.getline(linenum)
             endif
         endif
 
@@ -673,7 +740,7 @@ function! s:IndentNestedBlocks()
         endif
         " echom 'begin CASE found at: '.curline
         let curline = curline + 1
-        let end_of_case = s:IndentNestedCase( begin_case, curline, 
+        let end_of_case = s:SQLU_IndentNestedCase( begin_case, curline, 
                     \ line("'z-1") )
         let end_of_case = end_of_case + 1
         let ret = end_of_case
@@ -688,7 +755,7 @@ function! s:IndentNestedBlocks()
 endfunction
 
 " Recursively indent nested case statements
-function! s:IndentNestedCase( begin_case, start_line, end_line )
+function! s:SQLU_IndentNestedCase( begin_case, start_line, end_line )
 
     " Indent nested CASE blocks
     let linenum = a:start_line
@@ -698,7 +765,10 @@ function! s:IndentNestedCase( begin_case, start_line, end_line )
                 \ '\<end\( case\)\?\>', 'W', '' )
 
     if( (end_of_prev_case < a:start_line) || (end_of_prev_case > a:end_line) )
-        echom 'No matching end case for: '.getline((linenum-1))
+        call s:SQLU_WarningMsg(
+                    \ 'No matching end case for: ' .
+                    \ getline((linenum-1))
+                    \ )
         return -1
     " else
         " echom 'Matching END found at: '.end_of_prev_case
@@ -710,13 +780,13 @@ function! s:IndentNestedCase( begin_case, start_line, end_line )
         let curline = line(".")
         if( (curline > a:start_line) && (curline < end_of_prev_case) )
             let curline = curline + 1
-            let end_of_case = s:IndentNestedCase( a:begin_case, curline, 
+            let end_of_case = s:SQLU_IndentNestedCase( a:begin_case, curline, 
                         \ line("'z-1") )
-            " echom 'IndentNestedCase from: '.linenum.' to: '.end_of_case
+            " echom 'SQLU_IndentNestedCase from: '.linenum.' to: '.end_of_case
             silent! exec (curline-1) . "," . end_of_case . ">>"
         " else
-        "     echom 'IndentNestedCase No case statements, '.
-        "                 \ 'leaving IndentNestedCase: '.linenum
+        "     echom 'SQLU_IndentNestedCase No case statements, '.
+        "                 \ 'leaving SQLU_IndentNestedCase: '.linenum
         endif
     endif
 
@@ -726,7 +796,7 @@ endfunction
 " For certain keyword lines (SELECT, ORDER BY, GROUP BY, ...)
 " Ensure the lines fit in the textwidth (or default 80), wrap
 " the lines where necessary and left justify the column names
-function! s:WrapFunctionCalls()
+function! s:SQLU_WrapFunctionCalls()
     " Check if this is a statement that can often by longer than 80 characters
     " (select, set and so on), if so, ensure the column list is broken over as
     " many lines as necessary and lined up with the other columns
@@ -744,7 +814,9 @@ function! s:WrapFunctionCalls()
                 \ '\|order\|group\|having\|return'
 
     " Useful in the debugger
-    " echo linenum.' '.func_call.' '.virtcol(".").' '.','.substitute(getline("."), '^ .*\(\%'.(func_call-1).'c...\).*', '\1', '' ).', '.getline(linenum)
+    " echo linenum.' '.func_call.' '.virtcol(".").' 
+    " '.','.substitute(getline("."), '^ .*\(\%'.(func_call-1).'c...\).*', 
+    " '\1', '' ).', '.getline(linenum)
 
     " call Decho(" Before column splitter 'y+1=".line("'<").
     " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
@@ -782,13 +854,18 @@ function! s:WrapFunctionCalls()
             silent! exe 'norm! '.linenum."G\<bar>".func_call."l"
 
             if search('(', 'W') > linenum
-                echom 'WrapFunctionCalls - should have found a ('
+                call s:SQLU_WarningMsg(
+                            \ 'SQLU_WrapFunctionCalls - should have found a ('
+                            \ )
                 let linenum = linenum + 1
                 break
             endif
             let end_paran = searchpair( '(', '', ')', '' )
             if end_paran < linenum || end_paran > linenum
-                echom 'WrapFunctionCalls - should have found a matching )'
+                call s:SQLU_WarningMsg(
+                            \ 'SQLU_WrapFunctionCalls - ' . 
+                            \ 'should have found a matching )'
+                            \ )
                 let linenum = linenum + 1
                 break
             endif
@@ -814,7 +891,9 @@ function! s:WrapFunctionCalls()
                             \ '\s*' .
                             \ '\%'.(func_call+1).'c'
                 " echom 'preceeded_by_keyword: '.preceeded_by_keyword
-                " echom 'func_call:'.func_call.' Current character:"'.getline(linenum)[virtcol(func_call)].'"  - '.getline(linenum)
+                " echom 'func_call:'.func_call.' Current 
+                " character:"'.getline(linenum)[virtcol(func_call)].'"  - 
+                " '.getline(linenum)
                 if getline(linenum) !~? preceeded_by_keyword
                     " if line =~? '^\s*\('.sql_keywords.'\)'
                     " Place the function name on a new line
@@ -852,7 +931,7 @@ endfunction
 " For certain keyword lines (SELECT, ORDER BY, GROUP BY, ...)
 " Ensure the lines fit in the textwidth (or default 80), wrap
 " the lines where necessary and left justify the column names
-function! s:WrapLongLines()
+function! s:SQLU_WrapLongLines()
     " Check if this is a statement that can often by longer than 80 characters
     " (select, set and so on), if so, ensure the column list is broken over as
     " many lines as necessary and lined up with the other columns
@@ -983,49 +1062,64 @@ function! s:WrapLongLines()
 endfunction
 
 " Finds unbalanced paranthesis and put each one on a new line
-function! s:SplitUnbalParan()
+function! s:SQLU_SplitUnbalParan()
     let linenum = line("'y+1")
     while linenum <= line("'z-1")
         let line = getline(linenum)
-        " echom 'SplitUnbalParan: l: ' . linenum . ' t: '. getline(linenum)
+        " echom 'SQLU_SplitUnbalParan: l: ' . linenum . ' t: '. getline(linenum)
         if line !~ '('
-            " echom 'SplitUnbalParan: no (s: '.linenum.'  : '.getline(linenum)
+            " echom 'SQLU_SplitUnbalParan: no (s: '.linenum.'  : '.
+            " \ getline(linenum)
             let linenum = linenum + 1
             continue
         endif
             
-        " echom 'SplitUnbalParan: start line: '.linenum.' : '.line
+        " echom 'SQLU_SplitUnbalParan: start line: '.linenum.' : '.line
 
         let begin_paran = match( line, "(" )
         while begin_paran > -1
-            let curcol      = begin_paran + 1
+            " let curcol      = begin_paran + 1
+            let curcol      = begin_paran
             " echom 'begin_paran: '.begin_paran.
             "             \ ' line: '.linenum.
             "             \ ' col: '.curcol.
             "             \ ' : '.line
+
+            " Place the cursor on the (
+             "silent! exe 'norm! '.linenum."G\<bar>".(curcol-1)."l"
             silent! exe 'norm! '.linenum."G\<bar>".curcol."l"
+
+            " Find the matching closing )
             let indent_to = searchpair( '(', '', ')', '' )
+
+            " If the match is outside of the range, this is an unmatched (
             if indent_to < 1 || indent_to > line("'z-1")
                 " Return to previous location
-                echom 'Unmatched parentheses on line: ' . getline(linenum)
+                " echom 'Unmatched parentheses on line: ' . getline(linenum)
+                call s:SQLU_WarningMsg(
+                            \ 'Unmatched parentheses on line: ' . 
+                            \ getline(linenum)
+                            \ )
                 " echom 'Unmatched parentheses: Returning to: '.
                 "             \ linenum."G\<bar>".curcol."l"
                 "             \ " #: ".line(".")
                 "             \ " text: ".getline(".")
+                " silent! exe 'norm! '.linenum."G\<bar>".(curcol-1)."l"
                 silent! exe 'norm! '.linenum."G\<bar>".curcol."l"
                 return -1
             endif
              
             let matchline     = line(".")
             let matchcol      = virtcol(".")
-            " echom 'SplitUnbalParan searchpair: ' . indent_to.
+            " echom 'SQLU_SplitUnbalParan searchpair: ' . indent_to.
             "             \ ' col: '.matchcol.
             "             \ ' line: '.getline(indent_to)
 
+            " If the match is on a DIFFERENT line
             if indent_to != linenum
                 " If a ) is NOT the only thing on the line
                 " I have relaxed this, so it must be the first
-                " thing on the line
+                " thing on the line 
                 " if getline(indent_to) !~ '^\s*\(-@-\)\?)\s*$'
                 if getline(indent_to) !~ '^\s*\(-@-\)\?)'
                     " Place the paranethesis on a new line
@@ -1041,48 +1135,51 @@ function! s:SplitUnbalParan()
                 
                 " Place a marker at the beginning of the line so
                 " it can be Aligned with its matching paranthesis
-                silent! exec "normal! i-@-\<Esc>"
+                if getline(".") !~ '^\s*-@-'
+                    silent! exec "normal! i-@-\<Esc>"
+                endif
                 " echom 'Replacing ) with newline: '.line(".").
                 "             \ ' indent: '.curcol.' '
                 "             \ getline(indent_to)
 
+                " echom 'line:' . linenum . ' col:' . curcol
+                "echom linenum . ' ' . getline(linenum) . curcol . 
+                "\ ' ' . matchstr( getline(linenum),  
+                "\ '^.\{'.(curcol).'}\zs.*' )     
+
+
+                " Return to the original line
                 " Check if the line with the ( needs splitting
                 " as well
+                " Since the closing ) is on a different line, make sure
+                " this ( is the last character on the line, this is 
+                " necessary so that the blocks are correctly indented
                 " .\{8} - match any characters up to the 8th column
                 " \zs   - start the search in column 9
                 " \s*$  - If the line only has whitespace dont split
-                "
-                " if line !~=~ '^.\{'.curcol.'}\zs\s*$'     
 
-                " Bypass for now
-                if line !~ '^.\{'.curcol.'}\zs\s*$'     
+                if getline(linenum) !~ '^.\{'.(curcol+1).'}\zs\s*$'     
                     " Return to previous location
-                    " echom 'Returning to the (:  
-                    " '.linenum."G\<bar>".curcol."l"
                     silent! exe 'norm! '.linenum."G\<bar>".curcol."l"
 
                     " Place the paranethesis on a new line
-                    silent! exec "normal! i\n\<Esc>"
-
-                    " Remove leading spaces
-                    " exec 'normal! '.indent_to.','.indent_to.
-                    "             \'s/^\s*//e'."\n"
-                    silent! exec 's/^\s*//e'."\n"
-
-                    " Place a marker at the beginning of the line so
+                    " with the marker at the beginning so
                     " it can be Aligned with its matching paranthesis
-                    silent! exec "normal! i-@-\<Esc>"
-                    " echom 'Indented opening line: '.getline(".")
-                    " echom 'Replacing ( with newline: '.linenum.
-                    "             \ ' indent: '.(curcol-1).
-                    "             \ ' '.getline(linenum)."\n"
-                    "             \ ' '.getline(linenum+1)
+                    silent! exec "normal! a\n-@-\<Esc>"
+
+                    " Add 1 to the linenum since the remainder of this 
+                    " line has been moved 
+                    let linenum = linenum + 1
+                    " Reset begin_paran since we are on a new line
+                    let begin_paran = -1
+
                 endif
             endif
 
             " We have potentially changed the line we are on
             " so get a new copy of the row to perform the match
-            let begin_paran = match( getline(linenum), "(", curcol )
+            " Add one to the curcol to look for the next (
+            let begin_paran = match( getline(linenum), "(", (begin_paran+1) )
 
         endwhile
 
@@ -1098,7 +1195,7 @@ endfunction
 " Will search through the file looking for the create table command
 " It assumes that each column is on a separate line
 " It places the column list in unnamed buffer
-function! CreateColumnList(...)
+function! SQLU_CreateColumnList(...)
 
     " Mark the current line to return to
     let curline     = line(".")
@@ -1127,8 +1224,35 @@ function! CreateColumnList(...)
     if( only_primary_key == 0 )
         let srch_table = '\c^[ \t]*create.*table.*\<'.table_name.'\>'
     else
-        let srch_table = '\c^[ \t]*\(create\|alter\).*table.*\<'.
-                    \ table_name.'\>'
+        " Regular expression breakdown
+        " Ingore case and spaces
+        " line begins with either create or alter
+        " followed by table and table_name (on the same line)
+        " Could be other lines inbetween these
+        " Look for the primary key clause (must be one)
+        " Start the match after the open paran
+        " The ccolumn list could span multiple lines
+        " End the match on the closing paran
+        " Could be other lines inbetween these
+        " Remove any newline characters for the command
+        " terminator (ie "\ngo" )
+        " Besides a CREATE TABLE statement, this expression
+        " should find statements like:
+        "     ALTER TABLE SSD.D_CENTR_ALLOWABLE_DAYS
+        "         ADD PRIMARY KEY (CUST_NBR, CAL_NBR, GRP_NBR,
+        "              EVENT_NBR, ALLOW_REVIS_NBR, ROW_REVIS_NBR);
+        let srch_table = '\c^[ \t]*' . 
+                    \ '\(create\|alter\)' . 
+                    \ '.*table.*' . 
+                    \ table_name .                
+                    \ '\_.\{-}' .    
+                    \ '\%(primary key\)\{-1,}' . 
+                    \ '\s*(\zs' . 
+                    \ '\_.\{-}' . 
+                    \ '\ze)' . 
+                    \ '\_.\{-}' . 
+                    \ substitute( g:sqlutil_cmd_terminator,
+                            \ "[\n]", '', "g" )
     endif
 
     " Loop through all currenly open buffers to look for the 
@@ -1150,70 +1274,80 @@ function! CreateColumnList(...)
         silent! exe "norm! 1G\<bar>0\<bar>"
         if( search( srch_table, "W" ) ) > 0
             if( only_primary_key == 0 )
-                " Get the list of all columns for the table
-                " let cmd = 'silent! normal! /'.srch_create_table."\n"
-                " exe cmd
+                " Find the create table statement
+                " let cmd = '/'.srch_create_table."\n"
                 " Find the opening ( that starts the column list
-                " and move down one line
-                let cmd = 'normal! /('."\n".'j'
-                " Visually select until the following keyword are the beginning
-                " of the line, this should be at the bottom of the column list
-                " Backup up one line so this line is not included
+                let cmd = 'norm! /('."\n".'Vib'."\<ESC>"
                 silent! exe cmd
-                " Start visually selecting columns
-                let cmd = 'silent! normal! V'."\n"
-                let cmd = cmd . '/^[ \t]*' " ignore spaces and tabs at start
-                            " Stop visually selecting until the 
-                            " following keywords
-                let cmd = cmd . '\(' 
-                            " Closing ) followed by cmd terminator
-                let cmd = cmd . ')\?.*'.g:sqlutil_cmd_terminator
-                let cmd = cmd . '\|primary' " PRIMARY KEY
-                let cmd = cmd . '\|reference' " foreign keys
-                let cmd = cmd . '\|unique' " indicies
-                let cmd = cmd . '\|check' " check contraints
-                let cmd = cmd . '\|foreign' " foreign keys
-                let cmd = cmd . '\)' " end of criteria
-                let cmd = cmd . '/-' "back up one line
-                let cmd = cmd . "\n\<ESC>" " hit enter to complete the command
-                " Decho cmd
-                silent! exe cmd
-                silent! exe 'noh'
-                let found = 1
+                " Decho 'end: '.getline(line("'>"))
                 let start_line = line("'<")
                 let end_line = line("'>")
+                silent! exe 'noh'
+                let found = 1
                 
+                " Visually select until the following keyword are the beginning
+                " of the line, this should be at the bottom of the column list
+                " Start visually selecting columns
+                " let cmd = 'silent! normal! V'."\n"
+                let find_end_of_cols = 
+                            \ '\(' .
+                            \ ')\?\s*' . g:sqlutil_cmd_terminator .
+                            \ substitute(
+                            \ g:sqlutil_col_list_terminators,
+                            \ '\s*\(\w\+\)\s*\%(,\)\?',
+                            \ '\\|\1',
+                            \ 'g'
+                            \ ) .
+                            \ '\)' 
+                    
+                let separator = ""
+                let columns = ""
+
+                " Build comma separated list of input parameters
                 while start_line <= end_line
                     let line = getline(start_line)
-                    " Decho line
-                    " Strip out the column name
-                    let columns = columns .
-                                \ substitute( line, 
-                                \ '^[ \t"]*\(\w\+\).*,\?\(.*\)', '\1', "g" )
-                    " Decho columns
-                    if start_line < end_line
-                        let columns = columns . ", "
+
+                    " If the line has no words on it, skip it
+                    if line !~ '\w' || line =~ '^\s*$'
+                        let start_line = start_line + 1
+                        continue
                     endif
+
+                    " if any of the find_end_of_cols is found, leave this loop.
+                    " This test is case insensitive.
+                    if line =~? find_end_of_cols
+                        let end_line = start_line - 1
+                        break
+                    endif
+
+                    " Decho line
+                    let column_name = substitute( line, 
+                                \ '[ \t"]*\(\<\w\+\>\).*', '\1', "g" )
+                    let column_def = SQLU_GetColumnDatatype( line, 1 )
+
+                    let columns = columns . separator . column_name
+                    let separator  = ", "
                     let start_line = start_line + 1
                 endwhile
+
             else
                 " Find the primary key statement
-                if( search( '\cPRIMARY KEY[\n\s]*', "W" ) ) > 0
-                    silent! exe 'silent! norm! /(/e+1'."\n".'v/)/e-1'."\n".'"zy'
-                    let columns = @z
-                    " Strip newlines characters
-                    let columns = substitute( columns, 
-                                \ "[\n]", '', "g" )
-                    " Strip everything but the column list
-                    let columns = substitute( columns, 
-                                \ '\s*\(.*\)\s*', '\1', "g" )
-                    " Remove double quotes
-                    let columns = substitute( columns, '"', '', "g" )
-                    let columns = substitute( columns, ',\s*', ', ', "g" )
-                    let columns = substitute( columns, '^\s*', '', "g" )
-                    let columns = substitute( columns, '\s*$', '', "g" )
-                    let found = 1
-                endif
+                " Visually select all the text until the 
+                " closing paranthesis
+                silent! exe 'silent! norm! v/)/e-1'."\n".'"zy'
+                let columns = @z
+                " Strip newlines characters
+                let columns = substitute( columns, 
+                            \ "[\n]", '', "g" )
+                " Strip everything but the column list
+                let columns = substitute( columns, 
+                            \ '\s*\(.*\)\s*', '\1', "g" )
+                " Remove double quotes
+                let columns = substitute( columns, '"', '', "g" )
+                let columns = substitute( columns, ',\s*', ', ', "g" )
+                let columns = substitute( columns, '^\s*', '', "g" )
+                let columns = substitute( columns, '\s*$', '', "g" )
+                let found = 1
                 silent! exe 'noh'
             endif
 
@@ -1227,7 +1361,9 @@ function! CreateColumnList(...)
         endif
         
         if &hidden == 0
-            echom "Cannot search other buffers with set nohidden"
+            call s:SQLU_WarningMsg(
+                        \ "Cannot search other buffers with set nohidden"
+                        \ )
             break
         endif
 
@@ -1253,29 +1389,31 @@ function! CreateColumnList(...)
 
     if found == 0
         let @@ = ""
-        echo "CreateColumnList - Table: " . table_name . " was not found"
+        if( only_primary_key == 0 )
+            call s:SQLU_WarningMsg(
+                        \ "SQLU_CreateColumnList - Table: " .
+                        \ table_name . 
+                        \ " was not found"
+                        \ )
+        else
+            call s:SQLU_WarningMsg(
+                        \ "SQLU_CreateColumnList - Table: " .
+                        \ table_name . 
+                        \ " does not have a primary key"
+                        \ )
+        endif
         return ""
     endif 
 
+    " If clipboard is pointing to the windows clipboard
+    " copy the results there.
     if &clipboard == 'unnamed'
         let @* = columns 
     else
         let @@ = columns 
     endif
 
-    " If a parameter has been passed, this means replace the 
-    " current word, with the column list
-    " if (a:0 > 0) && (found == 1)
-        " exec "silent! normal! viwp"
-        " if &clipboard == 'unnamed'
-            " let @* = table_name 
-        " else
-            " let @@ = table_name 
-        " endif
-        " echo "Paste register: " . table_name
-    " else
-        echo "Paste register: " . columns
-    " endif
+    echo "Paste register: " . columns
 
     return columns
 
@@ -1283,30 +1421,27 @@ endfunction
 
 
 " Strip the datatype from a column definition line
-function! GetColumnDatatype( line, need_type )
+function! SQLU_GetColumnDatatype( line, need_type )
 
     let pattern = '\c^\s*'  " case insensitve, white space at start of line
-    let pattern = pattern . '\S\+\s\+' " non white space (name with quotes)
+    let pattern = pattern . '\S\+\w\+[ "\t]\+' " non white space (name with 
+                                               " quotes)
 
     if a:need_type == 1
-        let pattern = pattern . '\(.\{-}\)' " match anything, but as little
-        " as possible - column datatype
-        let pattern = pattern . '\(\s\+' " exclude spaces
-        let pattern = pattern . '\(' " stop matching the datatype at
-        " the following keywords
-        let pattern = pattern . '\(NOT\s\+\)\=NULL' " NOT NULL or NULL
-        let pattern = pattern . '\|DEFAULT.*'  " column DEFAULT
-        let pattern = pattern . '\)' " end of keywords
-        let pattern = pattern . '\)\=,\=$' " Optional comma at the end of line
+        let pattern = pattern . '\zs'    " Start matching the datatype
+        let pattern = pattern . '.\{-}'  " include anything
+        let pattern = pattern . '\ze\s*'    " Stop matching when ...
+        let pattern = pattern . '\(NOT\|NULL\|DEFAULT\|'
+        let pattern = pattern . '\(\s*,\s*$\)' " Line ends with a comma 
+        let pattern = pattern . '\)' 
     else
-        let pattern = pattern . '\(.\{-}\)' " match until end of line
-        let pattern = pattern . '\=,\=$' " Optional comma at the end of line
+        let pattern = pattern . '\zs'   " Start matching the datatype
+        let pattern = pattern . '.\{-}' " include anything
+        let pattern = pattern . '\ze'   " Stop matching when ...
+        let pattern = pattern . '\s*,\s*$' " Line ends with a comma 
     endif
 
-    " Decho pattern
-    " Decho "echo substitute( '".a:line."','". pattern."', '\1', '')"
-    let datatype = substitute( a:line, pattern, '\1', '')
-    " Decho "Datatype: " . datatype
+    let datatype = matchstr( a:line, pattern )
 
     return datatype
 endfunction
@@ -1316,7 +1451,7 @@ endfunction
 " Will search through the file looking for the create table command
 " It assumes that each column is on a separate line
 " It places the column list in unnamed buffer
-function! GetColumnDef( ... )
+function! SQLU_GetColumnDef( ... )
 
     " Mark the current line to return to
     let curline     = line(".")
@@ -1361,7 +1496,7 @@ function! GetColumnDef( ... )
         if( search( srch_column_name, "w" ) ) > 0
             silent! exe 'noh'
             let found = 1
-            let column_def = GetColumnDatatype( getline("."), need_type )
+            let column_def = SQLU_GetColumnDatatype( getline("."), need_type )
         endif
 
         " Return to previous location
@@ -1372,7 +1507,9 @@ function! GetColumnDef( ... )
         endif
         
         if &hidden == 0
-            echom "Cannot search other buffers with set nohidden"
+            call s:SQLU_WarningMsg(
+                        \ "Cannot search other buffers with set nohidden"
+                        \ )
             break
         endif
 
@@ -1423,7 +1560,7 @@ endfunction
 
 " Creates a procedure defintion into the unnamed buffer for the 
 " table that the cursor is currently under.
-function! CreateProcedure(...)
+function! SQLU_CreateProcedure(...)
 
     " Mark the current line to return to
     let curline     = line(".")
@@ -1462,7 +1599,7 @@ function! CreateProcedure(...)
     "   "id"                            integer NOT NULL,
     "   "last_sync"                     timestamp NULL,
     "   "sync_required"                 char(1) NOT NULL DEFAULT 'N',
-    "   "retries"                       smallint NOT NULL ,
+    "   "retries"                       smallint NOT NULL,
     "   PRIMARY KEY ("id")
     " );
     while( 1==1 )
@@ -1477,7 +1614,6 @@ function! CreateProcedure(...)
             " Find the create table statement
             " let cmd = '/'.srch_create_table."\n"
             " Find the opening ( that starts the column list
-            " and move down one line
             let cmd = 'norm! /('."\n".'Vib'."\<ESC>"
             silent! exe cmd
             " Decho 'end: '.getline(line("'>"))
@@ -1490,72 +1626,88 @@ function! CreateProcedure(...)
             " of the line, this should be at the bottom of the column list
             " Start visually selecting columns
             " let cmd = 'silent! normal! V'."\n"
-            let find_end_of_cols = '/^[ \t]*' .
-                        \ '\(primary' .
-                        \ '\|reference' .
-                        \ '\|unique' .
-                        \ '\|check' .
-                        \ '\|foreign' .
-                        \ '\|)\?\s*' . g:sqlutil_cmd_terminator .
-                        \ '\)'
-            " Decho find_end_of_cols
+            let find_end_of_cols = 
+                        \ '\(' .
+                        \ ')\?\s*' . g:sqlutil_cmd_terminator .
+                        \ substitute(
+                        \ g:sqlutil_col_list_terminators,
+                        \ '\s*\(\w\+\)\s*\%(,\)\?',
+                        \ '\\|\1',
+                        \ 'g'
+                        \ ) .
+                        \ '\)' 
                 
+            let separator = " "
+            let column_list = ""
+
             " Build comma separated list of input parameters
             while start_line <= end_line
                 let line = getline(start_line)
 
+                " If the line has no words on it, skip it
+                if line !~ '\w' || line =~ '^\s*$'
+                    let start_line = start_line + 1
+                    continue
+                endif
+
                 " if any of the find_end_of_cols is found, leave this loop.
                 " This test is case insensitive.
                 if line =~? find_end_of_cols
-                    let end_line = end_line - 1
+                    let end_line = start_line - 1
                     break
                 endif
 
                 " Decho line
                 let column_name = substitute( line, 
                             \ '[ \t"]*\(\<\w\+\>\).*', '\1', "g" )
-                let column_def = GetColumnDatatype( line, 1 )
+                let column_def = SQLU_GetColumnDatatype( line, 1 )
+
+                let column_list = column_list . separator . column_name
                 let procedure_def = procedure_def . 
                             \ indent_spaces .
+                            \ separator .
                             \ "IN @" . column_name .
-                            \ ' ' . column_def
-                if start_line < end_line
-                    let procedure_def = procedure_def .  ",\n"
-                else
-                    let procedure_def = procedure_def .  " )\n"
-                endif
+                            \ ' ' . column_def . "\n"
+
+                let separator  = ","
                 let start_line = start_line + 1
             endwhile
 
-            let procedure_def = procedure_def . "RESULT( " 
+            let procedure_def = procedure_def .  ")\n"
+            let procedure_def = procedure_def . "RESULT(\n" 
 
             let start_line = line("'<")
-            let end_line = line("'>")
+            let separator  = " "
             
             " Build comma separated list of datatypes
             while start_line <= end_line
                 let line = getline(start_line)
-                " Decho line
-                let column_def = GetColumnDatatype( line, 1 )
-                " Decho column
-                let procedure_def = procedure_def . column_def
-                if start_line < end_line
-                    let procedure_def = procedure_def .  ", "
-                else
-                    let procedure_def = procedure_def .  " )\n"
+                
+                " If the line has no words on it, skip it
+                if line !~ '\w' || line =~ '^\s*$'
+                    let start_line = start_line + 1
+                    continue
                 endif
+
+                let column_def = SQLU_GetColumnDatatype( line, 1 )
+                
+                let procedure_def = procedure_def .
+                            \ indent_spaces .
+                            \ separator . 
+                            \ column_def .
+                            \ "\n"
+
+                let separator  = ","
                 let start_line = start_line + 1
             endwhile
 
-            let column_list = CreateColumnList(table_name)
-            if strlen(column_list) == 0
-                echo "Table: " . table_name . " was not found"
-                " restore previous search string
-                let @/ = saveSearch
-            
-                return
-            endif
-            let pk_column_list = CreateColumnList(table_name, 'primary_keys')
+            let procedure_def = procedure_def .  ")\n"
+            " Strip off any spaces
+            let column_list = substitute( column_list, ' ', '', 'g' )
+            " Ensure there is one space after each ,
+            let column_list = substitute( column_list, ',', ', ', 'g' )
+            let pk_column_list = SQLU_CreateColumnList(
+                        \ table_name, 'primary_keys')
 
             let procedure_def = procedure_def . "BEGIN\n\n" 
             
@@ -1598,7 +1750,7 @@ function! CreateProcedure(...)
             " The order of the columns in the pk_column_list is not guaranteed
             " to be in the same order as the table list in the CREATE TABLE
             " statement.  So we must remove each word one at a time.
-            let no_pk_column_list = RemoveMatchingColumns(
+            let no_pk_column_list = SQLU_RemoveMatchingColumns(
                         \ column_list, pk_column_list )
 
             " Check for the special case where there is no 
@@ -1657,7 +1809,9 @@ function! CreateProcedure(...)
         endif
         
         if &hidden == 0
-            echom "Cannot search other buffers with set nohidden"
+            call s:SQLU_WarningMsg(
+                        \ "Cannot search other buffers with set nohidden"
+                        \ )
             break
         endif
 
@@ -1699,7 +1853,7 @@ endfunction
 " Compares two strings, and will remove all names from the first 
 " parameter, if the same name exists in the second column name.
 " The 2 parameters take comma separated lists
-function! RemoveMatchingColumns( full_col_list, dup_col_list )
+function! SQLU_RemoveMatchingColumns( full_col_list, dup_col_list )
 
     let stripped_col_list = a:full_col_list
     let pos = 0
@@ -1719,3 +1873,9 @@ function! RemoveMatchingColumns( full_col_list, dup_col_list )
     return stripped_col_list
 
 endfunction
+
+function! s:SQLU_WarningMsg(msg) "{{{
+    echohl WarningMsg
+    echomsg a:msg
+    echohl None
+endfunction "}}}
