@@ -1,9 +1,9 @@
 *SQLUtilities.txt*      For Vim version 6.0. 
 
-Author:	        David Fishburn                             March 10, 2005
+Author:	        David Fishburn                             October 07, 2005
 
 SQLUtilities:   Variety of tools for working with SQL
-Version:        1.4.0
+Version:        1.4.1
 
 For instructions on installing this file, type
 	:help add-local-help |add-local-help| inside Vim.
@@ -534,11 +534,16 @@ For instructions on installing this file, type
   using Microsoft SQL Server a command terminator would be "go", or perhaps
   "\ngo".
 
-  To permanently override the terminator in your |vimrc| file you can add: >
+  To permanently override the terminator in your |vimrc| file you can add
+  (note: using double quotes is necessary when using \n): >
             let g:sqlutil_cmd_terminator = "\ngo"
 <
 ==============================================================================
 5. History                                       *sqlutil-history*
+
+  1.4.1: Octiber 07, 2005: 
+         NF: Added additional statements to g:sqlutil_col_list_terminators
+         BF: Forgot to increment g:loaded_sqlutilities
 
   1.4.0: March 10, 2005: 
          BF: If a statement has parenthesis inside of strings, the formatter

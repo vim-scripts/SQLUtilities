@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	  David Fishburn <fishburn@ianywhere.com>
 "   Date:	  Nov 23, 2002
-"   Last Changed: Sun Mar 13 2005 1:39:41 PM
-"   Version:	  1.4.0
+"   Last Changed: Fri Oct 07 2005 8:47:23 AM
+"   Version:	  1.4.1
 "   Script:	  http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -18,7 +18,7 @@
 if exists("g:loaded_sqlutilities") || &cp
     finish
 endif
-let g:loaded_sqlutilities = 138
+let g:loaded_sqlutilities = 141
 
 if !exists('g:sqlutil_align_where')
     let g:sqlutil_align_where = 1
@@ -26,6 +26,10 @@ endif
 
 if !exists('g:sqlutil_align_comma')
     let g:sqlutil_align_comma = 0
+endif
+
+if !exists('g:sqlutil_wrap_expressions')
+    let g:sqlutil_wrap_expressions = 0
 endif
 
 if !exists('g:sqlutil_align_first_word')
@@ -84,12 +88,13 @@ if !exists('g:sqlutil_col_list_terminators')
     "     foreign keys
     " 
     let g:sqlutil_col_list_terminators = 
-                \ 'primary\s\+key.*(' .              
-                \ ',references' .                    
-                \ ',unique' .                        
-                \ ',check' .                         
-                \ ',constraint' .                    
-                \ ',\%(not\s\+null\s\+\)\?foreign'   
+                \ 'primary\s\+key.*(' .
+                \ ',references' .
+                \ ',match' .
+                \ ',unique' .
+                \ ',check' .
+                \ ',constraint' .
+                \ ',\%(not\s\+null\s\+\)\?foreign'
 endif
 
 " Public Interface:
@@ -199,9 +204,14 @@ function! s:SQLU_Formatter(...) range
     " of the lines
     let ret = s:SQLU_ReformatStatement()
     if ret > -1
-        let ret = s:SQLU_IndentNestedBlocks()
+        if g:sqlutil_wrap_expressions == 1
+            let ret = s:SQLU_WrapExpressions()
+        endif
         if ret > -1
-            let ret = s:SQLU_WrapLongLines()
+            let ret = s:SQLU_IndentNestedBlocks()
+            if ret > -1
+                let ret = s:SQLU_WrapLongLines()
+            endif
         endif
     endif
 
@@ -489,6 +499,10 @@ function! s:SQLU_ReformatStatement()
                 \ 'join\)\|' .
                 \ '\%(\%(\%(cross\)\?\s*\)\?join\)' .
                 \ '\)'
+    " Decho 'join types: ' . sql_join_type_keywords
+    " join operator syntax
+    " [ KEY | NATURAL ] [ join_type ] JOIN
+    " | CROSS JOIN
     " force each keyword onto a newline
     let sql_keywords =  '\<\%(create\|drop\|call\|select\|set\|values\|' .
                 \ sql_update_keywords . '\|' .
@@ -1006,6 +1020,82 @@ function! s:SQLU_WrapAtCommas()
                 " Go to the end of the new lines
                 silent! exec "'e-" 
                 let linenum = line("'e")-1
+            " endif
+        endif
+
+        let linenum = linenum + 1
+    endwhile
+
+    return linenum
+endfunction
+
+" For certain keyword lines (SELECT, ORDER BY, GROUP BY, ...)
+" Ensure the lines fit in the textwidth (or default 80), wrap
+" the lines where necessary and left justify the column names
+function! s:SQLU_WrapExpressions()
+    " Check if this is a statement that can often by longer than 80 characters
+    " (select, set and so on), if so, ensure the column list is broken over as
+    " many lines as necessary and lined up with the other columns
+    let linenum = line("'y+1")
+
+    let sql_keywords = '\<\%(select\)\>'
+    let sql_expression_operator = '' .
+                \ '\<\%(' .
+                \ '\%(end\s\+\)\@<!if\|else\%(if\)\?\|endif\|case\|when\|end' .
+                \ '\)\>'
+
+    " call Decho(" Before column splitter 'y+1=".line("'<").
+    " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
+    while linenum <= line("'z-1")
+        let line = getline(linenum)
+        " if line =~? '^\s*\('.sql_keywords.'\)'
+        if line =~? '\w'
+            " if line =~? '^\s*\('.sql_keywords.'\)'
+                " Decho 'linenum: ' . linenum . ' strlen: ' .
+                " \ strlen(line) . ' textwidth: ' . &textwidth .
+                " \ '  line: ' . line
+                " go to the current line
+                silent! exec linenum 
+                " Mark the start of the wide line
+                silent! exec "normal mb"
+                let markb = linenum
+                " echom "line b - ".getline("'b")
+                " Mark the next line
+                silent! exec "normal jmek"
+                " echom "line e - ".getline("'e")
+
+
+                if line =~? '\('.sql_expression_operator.'\)'
+                    silent! exec linenum . ',' . linenum . 
+                                \ 's/^\s*\('.sql_keywords.'\)\s*'.
+                                \ '/\1-@-'
+                    " Create a special marker for Align.vim
+                    " to line up the columns with
+                    silent! exec linenum . ',' . linenum . 
+                                \ 's/'.sql_expression_operator.'/'.
+                                \ '\r-@-&'
+
+                endif
+
+                " echom "end_line_nbr - ".end_line_nbr
+                " echom "normal end_line_nbr - ".line(end_line_nbr)
+
+                " Append the special marker to the beginning of the line
+                " for Align.vim
+                " silent! exec "'b+," .end_line_nbr. 's/\s*\(.*\)/-@-\1'
+                " silent! exec "'b+," .end_line_nbr. 's/^\s*/-@-'
+                silent! exec ''.(markb+1)."," .end_line_nbr. 's/^\s*/-@-/g'
+                " silent! exec "'b+,'e-" . 's/\s*\(.*\)/-@-\1'
+                AlignCtrl Ip0P0rl:
+                " silent! 'b,'e-Align -@-
+                " silent! exec "'b,".end_line_nbr.'Align -@-'
+                silent! exec markb.",'e".'Align -@-'
+                " silent! 'b,'e-s/-@-/ /
+                silent! exec markb.",'e".'s/-@-/ /ge'
+                AlignCtrl default
+
+                " Advance the linenum to the end of the range
+                let linenum = line("'e") 
             " endif
         endif
 
