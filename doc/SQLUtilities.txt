@@ -1,9 +1,9 @@
 *SQLUtilities.txt*      For Vim version 6.0. 
 
-Author:	        David Fishburn                             October 07, 2005
+Author:	        David Fishburn                             September 09, 2007
 
 SQLUtilities:   Variety of tools for working with SQL
-Version:        1.4.1
+Version:        2.0.0
 
 For instructions on installing this file, type
 	:help add-local-help |add-local-help| inside Vim.
@@ -409,11 +409,11 @@ For instructions on installing this file, type
            MY_TABLE_NAME --> MTN
            my_table_name --> mtn
            My_table_NAME --> MtN
-<      2.  If the table name does NOT an '_', but DOES use mixed case 
-           then the case is used as a separator: >
+<      2.  If the table name does NOT contain a '_', but DOES use 
+           mixed case then the case is used as a separator: >
            MyTableName --> MTN
-<      3.  If the table name does NOT an '_', and does NOT use mixed case 
-           then the first letter of the table is used: >
+<      3.  If the table name does NOT contain a '_', and does NOT use 
+           mixed case then the first letter of the table is used: >
            mytablename --> m
            MYTABLENAME --> M
 <
@@ -541,7 +541,10 @@ For instructions on installing this file, type
 ==============================================================================
 5. History                                       *sqlutil-history*
 
-  1.4.1: Octiber 07, 2005: 
+  2.0.0: September 09, 2007: 
+         NF: Added support for Vim 7's autoload functionality
+
+  1.4.1: October 07, 2005: 
          NF: Added additional statements to g:sqlutil_col_list_terminators
          BF: Forgot to increment g:loaded_sqlutilities
 
