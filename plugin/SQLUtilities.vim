@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
-"   Author:	      David Fishburn <fishburn@ianywhere.com>
+"   Author:	      David Fishburn <dfishburn dot vim at gmail dot com>
 "   Date:	      Nov 23, 2002
-"   Last Changed: Sun 09 Sep 2007 10:26:40 PM Eastern Daylight Time
-"   Version:	  2.0.0
+"   Last Changed: 2009 Jan 15
+"   Version:	  3.0.0
 "   Script:	      http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -18,7 +18,7 @@
 if exists("g:loaded_sqlutilities") || &cp
     finish
 endif
-let g:loaded_sqlutilities = 200
+let g:loaded_sqlutilities = 300
 
 if !exists('g:sqlutil_align_where')
     let g:sqlutil_align_where = 1
@@ -47,7 +47,7 @@ endif
 if !exists('g:sqlutil_keyword_case')
     " This controls whether keywords should be made
     " upper or lower case.
-    " The default is to leave in current case.
+    " The default is to leave them in current case.
     let g:sqlutil_keyword_case = ''
 endif
 
@@ -96,6 +96,8 @@ if !exists('g:sqlutil_col_list_terminators')
                 \ ',constraint' .
                 \ ',\%(not\s\+null\s\+\)\?foreign'
 endif
+" Determines which menu items will be recreated
+let s:sqlutil_menus_created = 0
 
 " Public Interface:
 command! -range=% -nargs=* SQLUFormatStmts <line1>,<line2> 
@@ -110,6 +112,8 @@ command!        -nargs=* SQLUGetColumnDataType
             \ call SQLU_GetColumnDef(expand("<cword>"), 1)
 command!        -nargs=* SQLUCreateProcedure 
             \ call SQLU_CreateProcedure(<f-args>)
+command!        -nargs=* SQLUToggleValue 
+            \ call SQLU_ToggleValue(<f-args>)
 
 if !exists("g:sqlutil_load_default_maps")
     let g:sqlutil_load_default_maps = 1
@@ -162,23 +166,75 @@ nmap <unique> <script> <Plug>SQLUGetColumnDataType :SQLUGetColumnDataType<CR>
 nmap <unique> <script> <Plug>SQLUCreateProcedure   :SQLUCreateProcedure<CR>
 let g:loaded_sqlutilities_global_maps = 1
 
-if has("menu")
-    vnoremenu <script> Plugin.SQLUtil.Format\ Range\ Stmts :SQLUFormatStmts<CR>
-    noremenu  <script> Plugin.SQLUtil.Format\ Range\ Stmts :SQLUFormatStmts<CR>
-    vnoremenu <script> Plugin.SQLUtil.Format\ Statement :SQLUFormatter<CR>
-    noremenu  <script> Plugin.SQLUtil.Format\ Statement :SQLUFormatter<CR>
-    noremenu  <script> Plugin.SQLUtil.Create\ Procedure :SQLUCreateProcedure<CR>
-    inoremenu <script> Plugin.SQLUtil.Create\ Procedure  
-                \ <C-O>:SQLUCreateProcedure<CR>
-    noremenu  <script> Plugin.SQLUtil.Create\ Column\ List   
-                \ :SQLUCreateColumnList<CR>
-    inoremenu <script> Plugin.SQLUtil.Create\ Column\ List 
-                \ <C-O>:SQLUCreateColumnList<CR>
-    noremenu  <script> Plugin.SQLUtil.Column\ Definition 
-                \ :SQLUGetColumnDef<CR>
-    inoremenu <script> Plugin.SQLUtil.Column\ Definition 
-                \ <C-O>:SQLUGetColumnDef<CR>
+if !exists('g:sqlutil_default_menu_mode')
+    let g:sqlutil_default_menu_mode = 3
 endif
+
+function! SQLU_Menu()
+    if has("menu") && g:sqlutil_default_menu_mode != 0
+        if g:sqlutil_default_menu_mode == 1
+            let menuRoot = 'SQLUtil'
+        elseif g:sqlutil_default_menu_mode == 2
+            let menuRoot = '&SQLUtil'
+        else
+            let menuRoot = '&Plugin.&SQLUtil'
+        endif
+
+        let leader = '\'
+        if exists('g:mapleader')
+            let leader = g:mapleader
+        endif
+        let leader = escape(leader, '\')
+
+        if s:sqlutil_menus_created == 0 
+            exec 'vnoremenu <script> '.menuRoot.'.Format\ Range\ Stmts<TAB>'.leader.'sfr :SQLUFormatStmts<CR>'
+            exec 'noremenu  <script> '.menuRoot.'.Format\ Range\ Stmts<TAB>'.leader.'sfr :SQLUFormatStmts<CR>'
+            exec 'vnoremenu <script> '.menuRoot.'.Format\ Statement<TAB>'.leader.'sfs :SQLUFormatter<CR>'
+            exec 'noremenu  <script> '.menuRoot.'.Format\ Statement<TAB>'.leader.'sfs :SQLUFormatter<CR>'
+            exec 'noremenu  <script> '.menuRoot.'.Create\ Procedure<TAB>'.leader.'scp :SQLUCreateProcedure<CR>'
+            exec 'inoremenu <script> '.menuRoot.'.Create\ Procedure<TAB>'.leader.'scp  
+                        \ <C-O>:SQLUCreateProcedure<CR>'
+            exec 'noremenu  <script> '.menuRoot.'.Create\ Column\ List<TAB>'.leader.'sl   
+                        \ :SQLUCreateColumnList<CR>'
+            exec 'inoremenu <script> '.menuRoot.'.Create\ Column\ List<TAB>'.leader.'sl 
+                        \ <C-O>:SQLUCreateColumnList<CR>'
+            exec 'noremenu  <script> '.menuRoot.'.Column\ Definition<TAB>'.leader.'scd 
+                        \ :SQLUGetColumnDef<CR>'
+            exec 'inoremenu <script> '.menuRoot.'.Column\ Definition<TAB>'.leader.'scd 
+                        \ <C-O>:SQLUGetColumnDef<CR>'
+            exec 'noremenu  <script> '.menuRoot.'.Column\ Datatype<TAB>'.leader.'scdt
+                        \ :SQLUGetColumnDataType<CR>'
+            exec 'inoremenu <script> '.menuRoot.'.Column\ Datatype<TAB>'.leader.'scdt
+                        \ <C-O>:SQLUGetColumnDataType<CR>'
+
+            let s:sqlutil_menus_created = 1
+        endif
+        silent! exec 'aunmenu  <script> '.menuRoot.'.Toggle\ Align\ Where'
+        exec 'noremenu  <script> '.menuRoot.'.Toggle\ Align\ Where'.
+                    \ (g:sqlutil_align_where==1?'<TAB>(on) ':'<TAB>(off) ').
+                    \ ':SQLUToggleValue g:sqlutil_align_where<CR>'
+        silent! exec 'aunmenu '.menuRoot.'.Toggle\ Align\ Comma'
+        exec 'noremenu  <script> '.menuRoot.'.Toggle\ Align\ Comma'.
+                    \ (g:sqlutil_align_comma==1?'<TAB>(on) ':'<TAB>(off) ').
+                    \ ':SQLUToggleValue g:sqlutil_align_comma<CR>'
+        silent! exec 'aunmenu '.menuRoot.'.Toggle\ Align\ First\ Word'
+        exec 'noremenu  <script> '.menuRoot.'.Toggle\ Align\ First\ Word'.
+                    \ (g:sqlutil_align_first_word==1?'<TAB>(on) ':'<TAB>(off) ').
+                    \ ':SQLUToggleValue g:sqlutil_align_first_word<CR>'
+        silent! exec 'aunmenu '.menuRoot.'.Uppercase\ Keywords'
+        exec 'noremenu  <script> '.menuRoot.'.Uppercase\ Keywords'.
+                    \ (g:sqlutil_keyword_case=='\U'?'<TAB>(on) ':' ').
+                    \ ':SQLUToggleValue g:sqlutil_keyword_case \U<CR>'
+        silent! exec 'aunmenu '.menuRoot.'.Lowercase\ Keywords'
+        exec 'noremenu  <script> '.menuRoot.'.Lowercase\ Keywords'.
+                    \ (g:sqlutil_keyword_case=='\L'?'<TAB>(on) ':' ').
+                    \ ':SQLUToggleValue g:sqlutil_keyword_case \L<CR>'
+        silent! exec 'aunmenu '.menuRoot.'.Default\ Case\ Keywords'
+        exec 'noremenu  <script> '.menuRoot.'.Default\ Case\ Keywords'.
+                    \ (g:sqlutil_keyword_case==''?'<TAB>(on) ':' ').
+                    \ ':SQLUToggleValue g:sqlutil_keyword_case default<CR>'
+    endif
+endfunction
 
 " Puts a command separate list of columns given a table name
 " Will search through the file looking for the create table command
@@ -236,4 +292,31 @@ function! SQLU_RemoveMatchingColumns( full_col_list, dup_col_list )
     return SQLUtilities#SQLU_RemoveMatchingColumns( a:full_col_list, a:dup_col_list )
 endfunction
 
+
+
+" Toggles the value of some configuration parameters.
+" Mainly used by the menu.
+function! SQLU_ToggleValue( ... )
+    if (a:0 == 0)
+        echohl WarningMsg
+        echomsg "SQLUToggle value requires at least 1 parameter"
+        echohl None
+    elseif (a:0 == 1)
+        if exists('{a:1}') 
+            let {a:1} = (({a:1} == 0)?1:0)
+        endif
+    else
+        if exists('{a:1}') 
+            " Use defaults as the default for this function
+            if a:2 == 'default'
+                let {a:1} = ''
+            else
+                let {a:1} = a:2
+            endif
+        endif
+    endif
+    call SQLU_Menu()
+endfunction
+
+call SQLU_Menu()
 " vim:fdm=marker:nowrap:ts=4:expandtab:ff=unix:

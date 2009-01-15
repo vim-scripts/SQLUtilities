@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
-"   Author:	      David Fishburn <fishburn@ianywhere.com>
+"   Author:	      David Fishburn <dfishburn dot vim at gmail dot com>
 "   Date:	      Nov 23, 2002
-"   Last Changed: Sun 09 Sep 2007 10:26:27 PM Eastern Daylight Time
-"   Version:	  2.0.0
+"   Last Changed: 2008 Nov 14
+"   Version:	  3.0
 "   Script:	      http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -22,7 +22,7 @@ if v:version < 700
     echomsg "SQLUtilities: Version 2.0.0 or higher requires Vim7.  Version 1.4.1 can stil be used with Vim6."
     finish
 endif
-let g:loaded_sqlutilities_auto = 200
+let g:loaded_sqlutilities_auto = 300
 
 " SQLU_Formatter: align selected text based on alignment pattern(s)
 function! SQLUtilities#SQLU_Formatter(...) range
@@ -330,7 +330,7 @@ function! s:SQLU_ReformatStatement()
     let sql_join_type_keywords = '' . 
                 \ '\%(' .
                 \ '\%(inner\|' .
-                \ '\%(\%(\%(left\|right\|full\)\s*\%(outer\)\?\s*\)\?\)' .
+                \ '\%(\%(\%(left\|right\|full\)\%(\s\+outer\)\?\s*\)\?\)' .
                 \ '\)\?\s*\)\?'
     " Decho 'join types: ' . sql_join_type_keywords
     " join operator syntax
@@ -358,8 +358,7 @@ function! s:SQLU_ReformatStatement()
                 \ sql_connect_by_keywords . '\|' .
                 \ sql_merge_keywords . '\|' .
                 \ sql_ora_keywords . '\|' .
-                \ 'on\|where\|or\|order\s\+\%(\w\+\s\+\)\?by\|'.
-                \ 'group\s\+by\|' .
+                \ 'on\|where\|or\|\%(order\|group\)\s\+\%(\w\+\s\+\)\?\<by\>\|'.
                 \ sql_window_keywords . '\|' .
                 \ 'having\|for\|insert\|using\|' .
                 \ 'intersect\|except\|window\|' .
@@ -426,18 +425,6 @@ function! s:SQLU_ReformatStatement()
     " so that the keywords are RIGHT justified
     AlignCtrl default
 
-    let cmd = "'y+1,'z-1".'s/\<\(' .
-                \ sql_keywords .
-                \ '\|' .
-                \ sql_case_keywords .
-                \ '\|' .
-                \ sql_join_type_keywords .
-                \ '\|OUTER' .
-                \ '\)\>/' .
-                \ g:sqlutil_keyword_case .
-                \ '\1/gei'
-    silent! exec cmd
-
     if g:sqlutil_align_comma == 1 
         call s:SQLU_WrapAtCommas()
     endif
@@ -456,6 +443,22 @@ function! s:SQLU_ReformatStatement()
     AlignCtrl Ip0P0rl:
     silent! 'y+1,'z-1Align -@-
     silent! 'y+1,'z-1s/-@-/ /ge
+
+    " Now that we have removed the special alignment marker
+    " upper or lower case all the keywords only if the user
+    " has specified an override.
+    if g:sqlutil_keyword_case != ''
+        let cmd = "'y+1,'z-1".'s/\<\(' .
+                    \ sql_keywords .
+                    \ '\|' .
+                    \ sql_case_keywords .
+                    \ '\|' .
+                    \ sql_join_type_keywords .
+                    \ '\)\>/' .
+                    \ g:sqlutil_keyword_case .
+                    \ '\1/gei'
+        silent! exec cmd
+    endif
 
     " Now align the operators 
     " and the operators are CENTER justified

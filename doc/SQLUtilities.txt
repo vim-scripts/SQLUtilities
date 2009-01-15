@@ -538,8 +538,44 @@ For instructions on installing this file, type
   (note: using double quotes is necessary when using \n): >
             let g:sqlutil_cmd_terminator = "\ngo"
 <
+  By default a menu is created under the Plugin menu.  Menus are useful for a
+  number of reasons:
+        - See a list of available commands
+        - Remember what the shortcut maps are
+        - Have a floating menu when using the plugin a lot
+        - Allow you to quickly and easily toggle various formatting
+          options on a per statement basis.  Especially useful when
+          used with the floating menu.
+        - Quick reference guide
+  
+  You have several choices on where to place the menu.  There are four
+  settings that will control the placement of the menu: 
+        "0": Turns the menu off.
+        "1": Turns the 'SQLUtil' menu on with no menu shortcut.
+        "2": Turns the 'SQLUtil 'menu on with <alt>-d as the shortcut.
+        "3": Turns the 'Plugin -> SQLUtil' menu on with <alt>-s as 
+             the shortcut.
+  The option, g:sqlutil_default_menu_mode defaults to a value of 3 and can be
+  changed by adding the following to your vimrc: >
+            :let  g:sqlutil_default_menu_mode = 3
+<
 ==============================================================================
 5. History                                       *sqlutil-history*
+
+  3.0.0: November 20, 2008: 
+         NF: Added new menu links so that commonly used options can be
+             quickly and easily toggled without having to remember the 
+             global variable names or values.  For example, if you cut the 
+             menu so that it floats beside your buffer you can easily
+             hit "Toggle Align Where" or "Uppercase Keywords".  
+         NF: Using the menu_mode option you can control if and where the
+             SQLUtil menu is created.  See the menu_mode option for more
+             details.
+         NF: Added the default maps to the menus.  If you use a floating 
+             menu, or simply view the menu you can more easily memorize
+             your most commonly used maps.
+         BF: UPPER and lower case of keywords did not work for multi-word
+             keywords (ORDER BY, LEFT OUTER JOIN, ...).
 
   2.0.0: September 09, 2007: 
          NF: Added support for Vim 7's autoload functionality
@@ -674,7 +710,7 @@ For instructions on installing this file, type
 8. TODO                                          *sqlutil-todo*
 
   TODO:
-    1. Suggestions welcome email <fishburn@ianywhere.com>
+    1. Suggestions welcome email <dfishburn dot vim at gmail dot com>
 
 ==============================================================================
 
