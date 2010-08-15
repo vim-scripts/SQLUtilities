@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	      David Fishburn <dfishburn dot vim at gmail dot com>
 "   Date:	      Nov 23, 2002
-"   Last Changed: 2009 Jan 15
-"   Version:	  3.0.0
+"   Last Changed: 2010 Aug 14
+"   Version:	  4.0.0
 "   Script:	      http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -18,7 +18,7 @@
 if exists("g:loaded_sqlutilities") || &cp
     finish
 endif
-let g:loaded_sqlutilities = 300
+let g:loaded_sqlutilities = 400
 
 if !exists('g:sqlutil_align_where')
     let g:sqlutil_align_where = 1
@@ -34,6 +34,10 @@ endif
 
 if !exists('g:sqlutil_align_first_word')
     let g:sqlutil_align_first_word = 1
+endif
+
+if !exists('g:sqlutil_align_keyword_right')
+    let g:sqlutil_align_keyword_right = 1
 endif
 
 if !exists('g:sqlutil_cmd_terminator')
@@ -173,11 +177,17 @@ endif
 function! SQLU_Menu()
     if has("menu") && g:sqlutil_default_menu_mode != 0
         if g:sqlutil_default_menu_mode == 1
-            let menuRoot = 'SQLUtil'
+            let menuRoot     = 'SQLUtil'
+            let menuPriority = exists("g:sqlutil_menu_priority") ? g:sqlutil_menu_priority : ''
         elseif g:sqlutil_default_menu_mode == 2
-            let menuRoot = '&SQLUtil'
+            let menuRoot     = '&SQLUtil'
+            let menuPriority = exists("g:sqlutil_menu_priority") ? g:sqlutil_menu_priority : ''
+        elseif g:sqlutil_default_menu_mode == 3
+            let menuRoot     = exists("g:sqlutil_menu_root") ? g:sqlutil_menu_root : '&Plugin.&SQLUtil'
+            let menuPriority = exists("g:sqlutil_menu_priority") ? g:sqlutil_menu_priority : ''
         else
-            let menuRoot = '&Plugin.&SQLUtil'
+            let menuRoot     = '&Plugin.&SQLUtil'
+            let menuPriority = exists("g:sqlutil_menu_priority") ? g:sqlutil_menu_priority : ''
         endif
 
         let leader = '\'
@@ -187,50 +197,54 @@ function! SQLU_Menu()
         let leader = escape(leader, '\')
 
         if s:sqlutil_menus_created == 0 
-            exec 'vnoremenu <script> '.menuRoot.'.Format\ Range\ Stmts<TAB>'.leader.'sfr :SQLUFormatStmts<CR>'
-            exec 'noremenu  <script> '.menuRoot.'.Format\ Range\ Stmts<TAB>'.leader.'sfr :SQLUFormatStmts<CR>'
-            exec 'vnoremenu <script> '.menuRoot.'.Format\ Statement<TAB>'.leader.'sfs :SQLUFormatter<CR>'
-            exec 'noremenu  <script> '.menuRoot.'.Format\ Statement<TAB>'.leader.'sfs :SQLUFormatter<CR>'
-            exec 'noremenu  <script> '.menuRoot.'.Create\ Procedure<TAB>'.leader.'scp :SQLUCreateProcedure<CR>'
-            exec 'inoremenu <script> '.menuRoot.'.Create\ Procedure<TAB>'.leader.'scp  
+            exec 'vnoremenu <script> '.menuPriority.' '.menuRoot.'.Format\ Range\ Stmts<TAB>'.leader.'sfr :SQLUFormatStmts<CR>'
+            exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Format\ Range\ Stmts<TAB>'.leader.'sfr :SQLUFormatStmts<CR>'
+            exec 'vnoremenu <script> '.menuPriority.' '.menuRoot.'.Format\ Statement<TAB>'.leader.'sfs :SQLUFormatter<CR>'
+            exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Format\ Statement<TAB>'.leader.'sfs :SQLUFormatter<CR>'
+            exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Create\ Procedure<TAB>'.leader.'scp :SQLUCreateProcedure<CR>'
+            exec 'inoremenu <script> '.menuPriority.' '.menuRoot.'.Create\ Procedure<TAB>'.leader.'scp  
                         \ <C-O>:SQLUCreateProcedure<CR>'
-            exec 'noremenu  <script> '.menuRoot.'.Create\ Column\ List<TAB>'.leader.'sl   
+            exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Create\ Column\ List<TAB>'.leader.'sl   
                         \ :SQLUCreateColumnList<CR>'
-            exec 'inoremenu <script> '.menuRoot.'.Create\ Column\ List<TAB>'.leader.'sl 
+            exec 'inoremenu <script> '.menuPriority.' '.menuRoot.'.Create\ Column\ List<TAB>'.leader.'sl 
                         \ <C-O>:SQLUCreateColumnList<CR>'
-            exec 'noremenu  <script> '.menuRoot.'.Column\ Definition<TAB>'.leader.'scd 
+            exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Column\ Definition<TAB>'.leader.'scd 
                         \ :SQLUGetColumnDef<CR>'
-            exec 'inoremenu <script> '.menuRoot.'.Column\ Definition<TAB>'.leader.'scd 
+            exec 'inoremenu <script> '.menuPriority.' '.menuRoot.'.Column\ Definition<TAB>'.leader.'scd 
                         \ <C-O>:SQLUGetColumnDef<CR>'
-            exec 'noremenu  <script> '.menuRoot.'.Column\ Datatype<TAB>'.leader.'scdt
+            exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Column\ Datatype<TAB>'.leader.'scdt
                         \ :SQLUGetColumnDataType<CR>'
-            exec 'inoremenu <script> '.menuRoot.'.Column\ Datatype<TAB>'.leader.'scdt
+            exec 'inoremenu <script> '.menuPriority.' '.menuRoot.'.Column\ Datatype<TAB>'.leader.'scdt
                         \ <C-O>:SQLUGetColumnDataType<CR>'
 
             let s:sqlutil_menus_created = 1
         endif
-        silent! exec 'aunmenu  <script> '.menuRoot.'.Toggle\ Align\ Where'
-        exec 'noremenu  <script> '.menuRoot.'.Toggle\ Align\ Where'.
+        silent! exec 'aunmenu  <script> '.menuPriority.' '.menuRoot.'.Toggle\ Align\ Where'
+        exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Toggle\ Align\ Where'.
                     \ (g:sqlutil_align_where==1?'<TAB>(on) ':'<TAB>(off) ').
                     \ ':SQLUToggleValue g:sqlutil_align_where<CR>'
-        silent! exec 'aunmenu '.menuRoot.'.Toggle\ Align\ Comma'
-        exec 'noremenu  <script> '.menuRoot.'.Toggle\ Align\ Comma'.
+        silent! exec 'aunmenu '.menuPriority.' '.menuRoot.'.Toggle\ Align\ Comma'
+        exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Toggle\ Align\ Comma'.
                     \ (g:sqlutil_align_comma==1?'<TAB>(on) ':'<TAB>(off) ').
                     \ ':SQLUToggleValue g:sqlutil_align_comma<CR>'
-        silent! exec 'aunmenu '.menuRoot.'.Toggle\ Align\ First\ Word'
-        exec 'noremenu  <script> '.menuRoot.'.Toggle\ Align\ First\ Word'.
+        silent! exec 'aunmenu '.menuPriority.' '.menuRoot.'.Toggle\ Align\ First\ Word'
+        exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Toggle\ Align\ First\ Word'.
                     \ (g:sqlutil_align_first_word==1?'<TAB>(on) ':'<TAB>(off) ').
                     \ ':SQLUToggleValue g:sqlutil_align_first_word<CR>'
-        silent! exec 'aunmenu '.menuRoot.'.Uppercase\ Keywords'
-        exec 'noremenu  <script> '.menuRoot.'.Uppercase\ Keywords'.
+        silent! exec 'aunmenu '.menuPriority.' '.menuRoot.'.Toggle\ Right\ Align\ Keywords'
+        exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Toggle\ Right\ Align\ Keywords'.
+                    \ (g:sqlutil_align_keyword_right=='1'?'<TAB>(on) ':'<TAB>(off) ').
+                    \ ':SQLUToggleValue g:sqlutil_align_keyword_right<CR>'
+        silent! exec 'aunmenu '.menuPriority.' '.menuRoot.'.Uppercase\ Keywords'
+        exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Uppercase\ Keywords'.
                     \ (g:sqlutil_keyword_case=='\U'?'<TAB>(on) ':' ').
                     \ ':SQLUToggleValue g:sqlutil_keyword_case \U<CR>'
-        silent! exec 'aunmenu '.menuRoot.'.Lowercase\ Keywords'
-        exec 'noremenu  <script> '.menuRoot.'.Lowercase\ Keywords'.
+        silent! exec 'aunmenu '.menuPriority.' '.menuRoot.'.Lowercase\ Keywords'
+        exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Lowercase\ Keywords'.
                     \ (g:sqlutil_keyword_case=='\L'?'<TAB>(on) ':' ').
                     \ ':SQLUToggleValue g:sqlutil_keyword_case \L<CR>'
-        silent! exec 'aunmenu '.menuRoot.'.Default\ Case\ Keywords'
-        exec 'noremenu  <script> '.menuRoot.'.Default\ Case\ Keywords'.
+        silent! exec 'aunmenu '.menuPriority.' '.menuRoot.'.Default\ Case\ Keywords'
+        exec 'noremenu  <script> '.menuPriority.' '.menuRoot.'.Default\ Case\ Keywords'.
                     \ (g:sqlutil_keyword_case==''?'<TAB>(on) ':' ').
                     \ ':SQLUToggleValue g:sqlutil_keyword_case default<CR>'
     endif

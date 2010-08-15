@@ -1,40 +1,160 @@
-*SQLUtilities.txt*      For Vim version 6.0. 
+*SQLUtilities.txt*      For Vim version 7.0. 
 
-Author:	        David Fishburn                             September 09, 2007
+Author:	        David Fishburn                             October 1, 2009
 
 SQLUtilities:   Variety of tools for working with SQL
-Version:        2.0.0
+Version:        4.0.0
+Homepage:       http://www.vim.org/scripts/script.php?script_id=492
+Feedback:	    David Fishburn <dfishburn dot vim at gmail dot com>
 
 For instructions on installing this file, type
 	:help add-local-help |add-local-help| inside Vim.
+
 
 ==============================================================================
 1. Contents                                      *sqlutil* *sqlutil-contents*
 
     1. Contents...............................: |sqlutil-contents|
-    2. Commands...............................: |sqlutil-commands|
-       2.1 SQLUFormatter......................: |sqlutil-formatter|
-           2.1.1 Formatting Examples..........: |sqlutil-examples|
-           2.1.2 Formatting Options...........: |sqlutil-format-options|
-                 2.1.2.1 Align Where Clause...: |sqlutil-align-where|
-                 2.1.2.2 Align Comma..........: |sqlutil-align-comma|
-                 2.1.2.3 Align First Word.....: |sqlutil-align-first-word|
-                 2.1.2.4 Change Keyword Case..: |sqlutil-change_keyword-case|
-       2.2 SQLUCreateColumnList...............: |sqlutil-column-list|
-       2.3 SQLUGetColumnDef...................: |sqlutil-column-definition|
+    2. Tutorial...............................: |sqlutil-tutorial|
+    3. Commands...............................: |sqlutil-commands|
+       3.1 SQLUFormatter......................: |sqlutil-formatter|
+           3.1.1 Formatting Examples..........: |sqlutil-examples|
+           3.1.2 Formatting Options...........: |sqlutil-format-options|
+                 3.1.2.1 Align Where Clause...: |sqlutil-align-where|
+                 3.1.2.2 Align Comma..........: |sqlutil-align-comma|
+                 3.1.2.3 Align First Word.....: |sqlutil-align-first-word|
+                 3.1.2.4 Align Keyword Right..: |sqlutil-align-keyword-right|
+                 3.1.2.5 Change Keyword Case..: |sqlutil-change_keyword-case|
+       3.2 SQLUCreateColumnList...............: |sqlutil-column-list|
+       3.3 SQLUGetColumnDef...................: |sqlutil-column-definition|
            SQLUGetColumnDataType..............: |sqlutil-column-datatype|
-       2.4 SQLUCreateProcedure................: |sqlutil-procedure|
-    3. Suggested Mappings.....................: |sqlutil-mappings|
-    4. Customization..........................: |sqlutil-customization|
-    5. History................................: |sqlutil-history|
-    6. Dependencies...........................: |sqlutil-dependencies|
-    7. Complementary Plugins..................: |sqlutil-complementary-plugins|
-    8. TODO...................................: |sqlutil-todo|
+       3.4 SQLUCreateProcedure................: |sqlutil-procedure|
+    4. Suggested Mappings.....................: |sqlutil-mappings|
+    5. Customization..........................: |sqlutil-customization|
+    6. History................................: |sqlutil-history|
+    7. Dependencies...........................: |sqlutil-dependencies|
+    8. Complementary Plugins..................: |sqlutil-complementary-plugins|
+    9. TODO...................................: |sqlutil-todo|
+
 
 ==============================================================================
-2. Commands                                      *sqlutil-commands*
+2. Tutorial                                      *sqlutil-tutorial*
 
-2.1 SQLUFormatter                                *sqlutil-formatter*
+My most used command is the formatting capability of SQLUtil.  Please
+ensure the Align.vim plugin has already been installed see
+|sqlutil-dependencies|.
+
+Section 3 covers each command in detail, but to use these commands you can 
+do the following.  Assume you have a SQL statement you would like to 
+be formatted. >
+    SELECT t1.c1, t1.c2, t1.c3, t2.column1, t2.column2 
+    FROM t1 JOIN t2 WHERE t1.c1 = 'hello'
+    AND t2.column2 = 'goodbye';
+
+There are several ways to format this statement.
+
+    1.  Start |visual-mode| using any of the modes (i.e. v, V or CTRL-V),
+        highlight the 2 lines and (assuming the default |<Leader>|) you can 
+        use the visual map: >
+            \sf (sql - format).
+<
+    2.  Start |visual-mode| using any of the modes (i.e. v, V or CTRL-V),
+        highlight the 2 lines and run the SQLUFormatter command: >
+            :'<,'>SQLUFormatter
+<            
+    3.  If using Vim in GUI mode, the plugin provides a menu to make accessing
+        the commands easier.  It also shows the mapping, to assist with 
+        remembering them.  After visually selecting the lines you can 
+        use the (default) menu as: >
+            Plugin->SQLUtil->Format Statement
+<            
+    4.  Specify the range of lines and run the SQLUFormatter command: >
+            :1,2SQLUFormatter
+<
+The default settings produce a formatted statement as: >
+    SELECT t1.c1, t1.c2, t1.c3, t2.column1, t2.column2
+      FROM t1
+      JOIN t2
+     WHERE t1.c1      = 'hello'
+       AND t2.column2 = 'goodbye';
+<
+Using the menu Plugin -> SQLUtil -> Toggle Align Where and reformat the
+statement: >
+    SELECT t1.c1, t1.c2, t1.c3, t2.column1, t2.column2
+      FROM t1
+      JOIN t2
+     WHERE t1.c1 = 'hello'
+       AND t2.column2 = 'goodbye';
+<
+Using the menu Plugin -> SQLUtil -> Toggle Right Align Keywords and 
+reformat the statement: >
+    SELECT t1.c1, t1.c2, t1.c3, t2.column1, t2.column2
+    FROM   t1
+    JOIN   t2
+    WHERE  t1.c1 = 'hello'
+    AND    t2.column2 = 'goodbye';
+<    
+Using the menu Plugin -> SQLUtil -> Toggle Align Comma and retoggle
+Plugin -> SQLUtil -> Toggle Right Align Keywords and reformat the
+statement: >
+    SELECT t1.c1
+         , t1.c2
+         , t1.c3
+         , t2.column1
+         , t2.column2
+      FROM t1
+      JOIN t2
+     WHERE t1.c1 = 'hello'
+       AND t2.column2 = 'goodbye';
+<    
+Using the menu Plugin -> SQLUtil -> Lowercase Keywords and reformat the
+statement: >
+    select t1.c1, t1.c2, t1.c3, t2.column1, t2.column2
+      from t1
+      join t2
+     where t1.c1 = 'hello'
+       and t2.column2 = 'goodbye';
+<
+Since there are many options to control how the statement is formatted, these 
+can be set from the command line (though it is easier using the menus): >
+    let g:sqlutil_align_where = 1
+    let g:sqlutil_<tab> to cycle through the various option names.
+<
+These features are much more easily set via the menu, which does a number of 
+things for you:
+    1.  Allows you to toggle the setting of the options.
+    2.  Does not require you to remember the option names.
+    3.  Shows the current setting of each of the options.
+
+The remaining commands all rely upon have the CREATE TABLE statements open 
+in Vim (either in the same buffer or a different one) and will work 
+over those statements: >
+    SQLUCreateColumnList
+    SQLUGetColumnDef
+    SQLUGetColumnDataType
+    SQLUCreateProcedure
+
+Each of these statements work on the current word the cursor is on.
+So if the cursor is on the "t1" word in the above SQL statement 
+the you can either use the command:
+    :SQLUCreateColumnList
+or 
+    \scl 
+
+See below for more information in the mappings.
+
+
+If you do not have the CREATE TABLE statements handy in a SQL file, the 
+dbext plugin (which I also author) can pull this information directly from 
+within the database.  So typically, I only use this plugin to format 
+SQL statements and use the dbext plugin to execute statement against a 
+database.  See |sqlutil-complementary-plugins| for more details.
+
+
+==============================================================================
+3. Commands                                      *sqlutil-commands*
+
+3.1 SQLUFormatter                                *sqlutil-formatter*
 
   [range]SQLUFormatter(..list..)                
 
@@ -51,7 +171,7 @@ For instructions on installing this file, type
          indent everything within the unbalanced parenthesis.
        - Works for SELECT, INSERT, UPDATE, DELETE statements.
 
-2.1.1 Formatting Examples:                       *sqlutil-examples*
+3.1.1 Formatting Examples:                       *sqlutil-examples*
 
     Original: >
     SELECT m.MSG_ID, m.PRIORITY_ID, CUST.CUST_NBR, CUST.CUST_NM, 
@@ -134,12 +254,12 @@ For instructions on installing this file, type
 <
 
 
-2.1.2 Formatting Options                         *sqlutil-format-options*
+3.1.2 Formatting Options                         *sqlutil-format-options*
 
   There are several options which can control how the SQL statements are
   formatted.
   
-2.1.2.1 Align Where Clause                       *sqlutil-align-where*
+3.1.2.1 Align Where Clause                       *sqlutil-align-where*
 
   sqlutil_align_where is used to align operators. Valid operators are: 
        =, =, >, <, >=, <=, !=, !<, !>, <> 
@@ -201,7 +321,7 @@ For instructions on installing this file, type
           AND CATHDR.CATEGORYID = PCAT.CATEGORYID
 <
 
-2.1.2.2 Align Comma                              *sqlutil-align-comma*
+3.1.2.2 Align Comma                              *sqlutil-align-comma*
 
   sqlutil_align_comma is used to force each column in a column list to be
   placed on a new line.  The SET statement in a UPDATE clause already 
@@ -238,7 +358,7 @@ For instructions on installing this file, type
          FROM some_table
 <
 
-2.1.2.3 Align First Word                         *sqlutil-align-first-word*
+3.1.2.3 Align First Word                         *sqlutil-align-first-word*
 
   sqlutil_align_first_word is used to control how the keywords are 
   aligned when formatting.  The default behaviour is the keywords
@@ -299,7 +419,33 @@ For instructions on installing this file, type
         ORDER BY CategoryID
 <
 
-2.1.2.4 Change Keyword Case                      *sqlutil-change_keyword-case*
+3.1.2.4 Align Keyword Right                     *sqlutil-align-keyword-right*
+
+  sqlutil_align_keyword_right is used to control how the keywords are 
+  aligned when formatting.  The default behaviour is the keywords
+  are RIGHT justified on the first keyword.  This option allows you to
+  choose whether the keywords are left or right justified.
+  This option is "1" by default. >
+       let g:sqlutil_align_keyword_right = 1
+
+           SELECT B.CATEGORYID CATID
+             FROM CATEGORY B
+            WHERE B.CATEGORYID     = intCategoryID
+              AND B.REVID          = intRevID
+              AND B.DEL            = 0
+<
+
+  To toggle: >
+       let g:sqlutil_align_keyword_right = 0
+
+           SELECT B.CATEGORYID CATID
+           FROM   CATEGORY B
+           WHERE  B.CATEGORYID     = intCategoryID
+           AND    B.REVID          = intRevID
+           AND    B.DEL            = 0
+<
+
+3.1.2.5 Change Keyword Case                      *sqlutil-change_keyword-case*
 
   sqlutil_keyword_case is used to control if the case of the keywords
   should be changed when formatting.  This option uses Vim's standard 
@@ -351,7 +497,7 @@ For instructions on installing this file, type
           and CATHDR.CATEGORYID = PCAT.CATEGORYID
 
 
-2.2 SQLUCreateColumnList                         *sqlutil-column-list*
+3.2 SQLUCreateColumnList                         *sqlutil-column-list*
 
   SQLUCreateColumnList( optional parameter(s) )
 
@@ -450,7 +596,7 @@ For instructions on installing this file, type
        ); 
 <
 
-2.3 SQLUGetColumnDef                             *sqlutil-column-definition*
+3.3 SQLUGetColumnDef                             *sqlutil-column-definition*
     SQLUGetColumnDataType                        *sqlutil-column-datatype*
 
   SQLUGetColumnDef( optional parameter )           
@@ -482,7 +628,7 @@ For instructions on installing this file, type
 <
 
 
-2.4 SQLUCreateProcedure()                        *sqlutil-procedure*
+3.4 SQLUCreateProcedure()                        *sqlutil-procedure*
 
   SQLUCreateProcedure()
 
@@ -506,8 +652,9 @@ For instructions on installing this file, type
   |hidden| must be enabled for this plugin to cycle through other open 
   buffers.  
 
+
 ==============================================================================
-3. Suggested Mappings:                           *sqlutil-mappings*
+4. Suggested Mappings:                           *sqlutil-mappings*
 
   vmap <leader>sf        <Plug>SQLU_Formatter<CR>
   nmap <leader>scl       <Plug>SQLU_CreateColumnList<CR>
@@ -527,8 +674,9 @@ For instructions on installing this file, type
   your |vimrc|:
           let g:sqlutil_load_default_maps = 0
 
+
 ==============================================================================
-4. Customization                                 *sqlutil-customization*
+5. Customization                                 *sqlutil-customization*
 
   By default this script assumes a command is terminated by a ; If you are
   using Microsoft SQL Server a command terminator would be "go", or perhaps
@@ -557,12 +705,38 @@ For instructions on installing this file, type
              the shortcut.
   The option, g:sqlutil_default_menu_mode defaults to a value of 3 and can be
   changed by adding the following to your vimrc: >
-            :let  g:sqlutil_default_menu_mode = 3
+            let  g:sqlutil_default_menu_mode = 3
 <
-==============================================================================
-5. History                                       *sqlutil-history*
+ You can also control where (and the name of) the SQLUtil menu is created
+ using the g:sqlutil_menu_root option.  It can be used in conjuction with
+ g:sqlutil_default_menu_mode = 3.  To create the menu: 'MyPlugins -> SQLUtil'
+ you can create the following variable: >
+            let  g:sqlutil_menu_root = 'MyPlugin.&SQLUtil'
+<            
+ Menus are created in a documented order by Vim (|menu-priority|).  You can
+ override this setting using sqlutil_menu_priority.  This option allows you to
+ override the setting and shift the SQLUtil menu item to the left between the
+ Edit and Tools menu. >
+            let  g:sqlutil_menu_priority = 30
 
-  3.0.0: November 20, 2008: 
+==============================================================================
+6. History                                       *sqlutil-history*
+
+  4.0.0: August 13, 2010: 
+         NF: Added a tutorial to take users through the common features 
+             of the plugin.
+         NF: Added an option, g:sqlutil_align_keyword_right, to left or 
+             right (default) align the keywords (Per Winkvist).
+         NF: Documented and added new global variables (g:sqlutil_menu_root,
+             g:sqlutil_menu_priority) to customize the location of the 
+             SQLUtil menu.
+         BF: SQLite used slightly different syntax specifying UNIQUE
+             values and would not correctly generate a column list
+             from the CREATE TABLE statement (Oliver Peters).
+         BF: Ensured all normal commands used ! to ensure no mappings
+             interfered with the commands (Benoit Mortgat).
+
+  3.0.0: January 15, 2009: 
          NF: Added new menu links so that commonly used options can be
              quickly and easily toggled without having to remember the 
              global variable names or values.  For example, if you cut the 
@@ -673,16 +847,18 @@ For instructions on installing this file, type
   1.0.0: Nov 13, 2002: 
          NF: Initial version.
     
+
 ==============================================================================
-6. Dependencies                                  *sqlutil-dependencies*
+7. Dependencies                                  *sqlutil-dependencies*
 
        Align.vim - Version 15 (as a minimum)
                  - Author: Charles E. Campbell, Jr.
                  - http://www.vim.org/script.php?script_id=294
                  - SQLUtilities uses this to extensively
 
+
 ==============================================================================
-7. Complementary Plugins                       *sqlutil-complementary-plugins*
+8. Complementary Plugins                       *sqlutil-complementary-plugins*
 
        dbext.vim  - Author: Peter Bagyinszki and David Fishburn
                   - http://www.vim.org/script.php?script_id=356
@@ -706,11 +882,13 @@ For instructions on installing this file, type
                     this includes, keywords, functions, tables, columns,
                     procedures and more.
 
+
 ==============================================================================
-8. TODO                                          *sqlutil-todo*
+9. TODO                                          *sqlutil-todo*
 
   TODO:
     1. Suggestions welcome email <dfishburn dot vim at gmail dot com>
+
 
 ==============================================================================
 
