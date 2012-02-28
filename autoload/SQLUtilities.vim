@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	      David Fishburn <dfishburn dot vim at gmail dot com>
 "   Date:	      Nov 23, 2002
-"   Last Changed: 2010 Aug 13
-"   Version:	  4.0.0
+"   Last Changed: 2012 Feb 24
+"   Version:	  5.0.0
 "   Script:	      http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -15,14 +15,18 @@
 "
 
 " Prevent duplicate loading
-if exists("g:loaded_sqlutilities_auto") || &cp
+if exists("g:loaded_sqlutilities_auto")
     finish
 endif
 if v:version < 700
     echomsg "SQLUtilities: Version 2.0.0 or higher requires Vim7.  Version 1.4.1 can stil be used with Vim6."
     finish
 endif
-let g:loaded_sqlutilities_auto = 400
+let g:loaded_sqlutilities_auto = 500
+
+" Turn on support for line continuations when creating the script
+let s:cpo_save = &cpo
+set cpo&vim
 
 " SQLU_Formatter: align selected text based on alignment pattern(s)
 function! SQLUtilities#SQLU_Formatter(...) range
@@ -31,10 +35,21 @@ function! SQLUtilities#SQLU_Formatter(...) range
         let mode = (a:1 == ''?'n':(a:1))
     endif
 
+    if ! exists( ':AlignCtrl' ) 
+        call s:SQLU_WarningMsg(
+                    \ 'SQLU_Formatter - The Align plugin cannot be found'
+                    \ )
+        return -1
+    endif
+
     call s:SQLU_WrapperStart( a:firstline, a:lastline, mode )
     " Store pervious value of highlight search
     let hlsearch = &hlsearch
     let &hlsearch = 0
+
+    " Store pervious value of gdefault
+    let gdefault = &gdefault
+    let &gdefault = 0
 
     " save previous search string
     let saveSearch = @/ 
@@ -69,6 +84,7 @@ function! SQLUtilities#SQLU_Formatter(...) range
 
     " restore previous search string
     let @/ = saveSearch
+    let &gdefault = gdefault
     
 endfunction
 
@@ -231,6 +247,58 @@ function! s:SQLU_WrapperEnd(mode)
     unlet b:curline     b:curcol
 endfunction
 
+" Generic Search and Replace uses syntax ID {{{
+function! s:SQLU_SearchReplace(exp_find_str, exp_rplc_str)
+
+    " Find the string index position of the first match
+    " 'c'	accept a match at the cursor position
+    " 'W'	don't wrap around the end of the file
+    let index = search(a:exp_find_str, 'cW', (line("'z")))
+    while index > 0
+        " Verify the cursor is within the range
+        if index >= line("'y") && index <= line("'z")
+
+            " Useful debug statment to see where on the line 
+            " and which keyword you are working on
+            " echo line(".") strpart(getline("."), col(".")-1)
+
+            let syn_element_list = split(g:sqlutil_syntax_elements, ',')
+            
+            if !empty(syn_element_list)
+                let found_in_str = 0
+                for syn_element_name in syn_element_list
+                    " Determine the ID for the name in the CSV list
+                    let syn_element_id = hlID(syn_element_name)
+
+                    " Grab the current syntax ID of the match
+                    let childsynid  = synID(line("."),col("."),1)
+                    let parentsynid = synIDtrans(synID(line("."),col("."),1)) 
+
+                    if childsynid == syn_element_id || parentsynid == syn_element_id
+                        let found_in_str = 1
+                        break
+                    endif
+                endfor
+                if found_in_str == 1
+                    " Advance the cursor 1 position since we use 
+                    " 'c' in the flags
+                    call cursor( line("."), (col(".") + 1) )
+                    let index = search(a:exp_find_str, 'cW', (line("'z")))
+                    continue
+                endif
+            endif
+
+            " At the current cursor position
+            exec 's/\%#/' . a:exp_rplc_str
+
+            let index = search(a:exp_find_str, 'cW', (line("'z")))
+        endif
+    endwhile
+    
+endfunction 
+" }}}
+
+
 " Reformats the statements 
 " 1. Keywords (FROM, WHERE, AND, ... ) " are on new lines
 " 2. Keywords are right justified
@@ -243,7 +311,21 @@ function! s:SQLU_ReformatStatement()
     " which would result in syntax errors
     " Comments could also contain keywords, which would be split
     " on to new lines
-    silent! 'y+1,'z-1s/.*\zs--.*//e
+    let srch_exp = '.*\zs--.*'
+    if exists("b:current_syntax") == 0 || g:sqlutil_use_syntax_support == 0
+        let cmd = "'y+1,'z-1s/". srch_exp .
+                    \ '//ge'
+        " Decho cmd
+        silent! exec cmd
+    else
+        " This uses Vim's syntax support to determine if
+        " a match is found within a string or not.
+        " Therefore only do it if syntax support is on
+        " which can be tested checking for the existance
+        " of the buffer local variable b:current_syntax
+        call s:SQLU_SearchReplace(srch_exp,  '')
+    endif
+
     " Join block of text into 1 line
     silent! 'y+1,'z-1j
     " Reformat the commas, to remove any spaces before them
@@ -375,14 +457,25 @@ function! s:SQLU_ReformatStatement()
     "           select
     "             from
     "            union all
-    let cmd = "'y+1,'z-1".'s/\%(^\s*\)\@<!\zs\<\(' .
+    let srch_exp = '\c\%(^\s*\)\@<!\zs\<\(' .
                 \ sql_keywords .
-                \ '\)\>\s*/' .
-                \ '\r\1' .
-                \ ( g:sqlutil_align_first_word==0 ? '-@-' : ' ' ) .
-                \ '/gei'
-    " Decho cmd
-    silent! exec cmd
+                \ '\)\>\s*'
+
+    if exists("b:current_syntax") == 0 || g:sqlutil_use_syntax_support == 0
+        let cmd = "'y+1,'z-1s/". srch_exp .
+                    \ '/\r\1' .
+                    \ ( g:sqlutil_align_first_word==0 ? '-@-' : ' ' ) .
+                    \ '/ge'
+        " Decho cmd
+        silent! exec cmd
+    else
+        " This uses Vim's syntax support to determine if
+        " a match is found within a string or not.
+        " Therefore only do it if syntax support is on
+        " which can be tested checking for the existance
+        " of the buffer local variable b:current_syntax
+        call s:SQLU_SearchReplace(srch_exp,  '\r\1' .  (g:sqlutil_align_first_word==0 ? '-@-' : ' ') )
+    endif
 
     " Ensure keywords at the beginning of a line have a space after them
     " This will ensure the Align program lines them up correctly
@@ -413,11 +506,30 @@ function! s:SQLU_ReformatStatement()
 
     " echom 'case: '.sql_case_keywords
     " The case keywords must not be proceeded by a -@-
-    silent! exec "'y+1,'z-1".'s/'.
-                \ '\%(-@-\)\@<!'.
+    " silent! exec "'y+1,'z-1".'s/'.
+    "             \ '\%(-@-\)\@<!'.
+    "             \ '\<\('.
+    "             \ sql_case_keywords.
+    "             \ '\)\>/\r-@-\1/gei'
+    let srch_exp = '\c\%(-@-\)\@<!'.
                 \ '\<\('.
                 \ sql_case_keywords.
-                \ '\)\>/\r-@-\1/gei'
+                \ '\)\>'
+
+    if exists("b:current_syntax") == 0 || g:sqlutil_use_syntax_support == 0
+        let cmd = "'y+1,'z-1s/". srch_exp .
+                    \ '/\r-@-\1' .
+                    \ '/ge'
+        " Decho cmd
+        silent! exec cmd
+    else
+        " This uses Vim's syntax support to determine if
+        " a match is found within a string or not.
+        " Therefore only do it if syntax support is on
+        " which can be tested checking for the existance
+        " of the buffer local variable b:current_syntax
+        call s:SQLU_SearchReplace(srch_exp,  '\r-@-\1' )
+    endif
 
     " AlignPush
 
@@ -662,6 +774,8 @@ function! s:SQLU_WrapFunctionCalls()
     " many lines as necessary and lined up with the other columns
     let linenum = line("'y+1")
 
+    return 
+
     let org_textwidth = &textwidth
     if org_textwidth == 0 
         " Get the width of the window
@@ -847,13 +961,22 @@ function! s:SQLU_WrapAtCommas()
                             " for Align
                             silent! exec linenum . ',' . linenum . 
                                         \ 's/\%' . (index + 1) . 'c,\s*' .
-                                        \ '/\r,-@-'
+                                        \ '/\r' .
+                                        \ (g:sqlutil_align_keyword_right == 1 ? ',-@-' : '-@-, ')
                             let linenum = linenum + 1
+
+                            let index = 0
+                            if g:sqlutil_align_keyword_right == 0
+                                " If aligning the commas with the left justified 
+                                " column names, we must skip ahead the index
+                                " to be infront of the -@-
+                                let index = 3
+                            endif
                         endif
                         " Find the index of the first non-white space
                         " which should be the , we just put on the 
                         " newline
-                        let index = match(getline(linenum), '\S')
+                        let index = match(getline(linenum), '\S', index)
                         let index = index + 1
                     endif
 
@@ -885,6 +1008,8 @@ function! s:SQLU_WrapExpressions()
     " (select, set and so on), if so, ensure the column list is broken over as
     " many lines as necessary and lined up with the other columns
     let linenum = line("'y+1")
+
+    return 
 
     let sql_keywords = '\<\%(select\)\>'
     let sql_expression_operator = '' .
@@ -962,6 +1087,8 @@ function! s:SQLU_WrapLongLines()
     " many lines as necessary and lined up with the other columns
     let linenum = line("'y+1")
 
+    return
+
     let org_textwidth = &textwidth
     if &textwidth == 0 
         " Get the width of the window
@@ -1025,8 +1152,15 @@ function! s:SQLU_WrapLongLines()
                     " Place the special marker that the first non-whitespace
                     " characeter
                     if g:sqlutil_align_comma == 1  && line =~ '^\s*,'
-                        silent! exec linenum . ',' . linenum .
-                                    \ 's/^\s*\zs,\s*/,  -@-'
+                        " silent! exec linenum . ',' . linenum .
+                        "             \ 's/^\s*\zs,\s*/,  -@-'
+                        if g:sqlutil_align_keyword_right == 1 
+                            silent! exec linenum . ',' . linenum .
+                                        \ 's/^\s*\zs,\s*/,  -@-'
+                        else
+                            silent! exec linenum . ',' . linenum .
+                                        \ 's/^\s*\zs,\s*/-@-, '
+                        endif
                     else
                         silent! exec linenum . ',' . linenum . 's/\S/-@-&'
                     endif
@@ -1324,9 +1458,9 @@ function! SQLUtilities#SQLU_CreateColumnList(...)
         " Could be other lines inbetween these
         " Look for the primary key clause (must be one)
         " Start the match after the open paran
-        " The ccolumn list could span multiple lines
+        " The column list could span multiple lines
         " End the match on the closing paran
-        " Could be other lines inbetween these
+        " Could be other lines in between these
         " Remove any newline characters for the command
         " terminator (ie "\ngo" )
         " Besides a CREATE TABLE statement, this expression
@@ -1989,5 +2123,8 @@ function! s:SQLU_WarningMsg(msg) "{{{
     echomsg a:msg
     echohl None
 endfunction "}}}
+
+let &cpo = s:cpo_save
+unlet s:cpo_save
 
 " vim:fdm=marker:nowrap:ts=4:expandtab:ff=unix:

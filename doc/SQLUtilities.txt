@@ -1,9 +1,9 @@
 *SQLUtilities.txt*      For Vim version 7.0. 
 
-Author:	        David Fishburn                             October 1, 2009
+Author:	        David Fishburn                             February 10, 2012
 
 SQLUtilities:   Variety of tools for working with SQL
-Version:        4.0.0
+Version:        5.0.0
 Homepage:       http://www.vim.org/scripts/script.php?script_id=492
 Feedback:	    David Fishburn <dfishburn dot vim at gmail dot com>
 
@@ -30,11 +30,15 @@ For instructions on installing this file, type
            SQLUGetColumnDataType..............: |sqlutil-column-datatype|
        3.4 SQLUCreateProcedure................: |sqlutil-procedure|
     4. Suggested Mappings.....................: |sqlutil-mappings|
-    5. Customization..........................: |sqlutil-customization|
-    6. History................................: |sqlutil-history|
-    7. Dependencies...........................: |sqlutil-dependencies|
-    8. Complementary Plugins..................: |sqlutil-complementary-plugins|
-    9. TODO...................................: |sqlutil-todo|
+    5. Global Options.........................: |sqlutil-options|
+    6. Customization..........................: |sqlutil-customization|
+        6.1 Cmd Terminator....................: |sqlutil-customization|
+        6.2 Vim Menu..........................: |sqlutil-customization|
+        6.3 Vim's Syntax Support..............: |sqlutil-customization|
+    7. History................................: |sqlutil-history|
+    8. Dependencies...........................: |sqlutil-dependencies|
+    9. Complementary Plugins..................: |sqlutil-complementary-plugins|
+    10.TODO...................................: |sqlutil-todo|
 
 
 ==============================================================================
@@ -676,7 +680,90 @@ database.  See |sqlutil-complementary-plugins| for more details.
 
 
 ==============================================================================
-5. Customization                                 *sqlutil-customization*
+5. Global Options                                *sqlutil-options*
+
+  Many defaults for the SQLUtilities plugin can be enabled or disabled or 
+  customized via entries in your .vimrc.  Here is a list of all options used 
+  by the plugin and a brief description of what it does.  A more complete
+  example of how to use this option can be found through the doc (if worthy) 
+  so just search for it.
+
+  Many of these options can be controlled via the SQLUtil menu, which is often 
+  far more convienent that tweaking these variables.
+
+  Global variables: >
+    sqlutil_align_where
+<       - See |sqlutil-align-where|
+        - Default: 1 >
+        let g:sqlutil_align_where = 1
+    sqlutil_align_comma
+<       - See |sqlutil-align-comma|
+        - Default: 0 >
+        let g:sqlutil_align_comma = 0
+    sqlutil_align_first_word
+<       - See |sqlutil-align-first-word|
+        - Default: 0 >
+        let g:sqlutil_align_first_word = 0
+    sqlutil_align_keyword_right
+<       - See |sqlutil-align-keyword-right|
+        - Default: 1 >
+        let g:sqlutil_align_keyword_right = 1
+    sqlutil_wrap_expressions
+<       - By default, when formatting a statement if a column is an expression 
+          or function call which is very long, break it apart and indent 
+          portions of it to make it clear.
+        - Default: 0 >
+        let g:sqlutil_wrap_expressions = 0
+    sqlutil_cmd_terminator
+<       - Certain SQL statements require cmd terminators.  Different databases
+          have different defaults.  This is important when parsing SQL files.
+        - Default: ';' >
+        let g:sqlutil_cmd_terminator = ';'
+        let g:sqlutil_cmd_terminator = "\ngo\n"
+    sqlutil_stmt_keywords
+<       - Used by the SQLUFormatter command to determine which SQL statements 
+          to format.
+        - Default: 'select,insert,update,delete,with,merge' >
+        let g:sqlutil_stmt_keywords = 'select,insert,update,delete,with,merge'
+    sqlutil_keyword_case
+<       - See |sqlutil-change_keyword-case|
+        - Default: '' >
+        let g:sqlutil_keyword_case = ''
+    sqlutil_use_tbl_alias
+<       - See |sqlutil-column-list|
+        - Default: 'a' >
+        let g:sqlutil_use_tbl_alias = 'a'
+    g:sqlutil_use_syntax_support
+<       - See |sqlutil-customization||
+        - Default: 1 >
+        let g:g:sqlutil_use_syntax_support = 1
+    sqlutil_syntax_elements
+<       - See |sqlutil-column-list|
+        - Default: 'Constant,sqlString' >
+        let g:sqlutil_syntax_elements = 'Constant,sqlString'
+    sqlutil_col_list_terminators
+<       - See |sqlutil-change_keyword-case| >
+        let g:sqlutil_col_list_terminators = 
+                    \ 'primary\s\+key.*(' .
+                    \ ',references' .
+                    \ ',match' .
+                    \ ',unique' .
+                    \ ',check' .
+                    \ ',constraint' .
+                    \ ',\%(not\s\+null\s\+\)\?foreign'
+    sqlutil_load_default_maps
+<       - See |sqlutil-mappings|
+        - Default: 1 >
+        let g:sqlutil_load_default_maps = 1
+    sqlutil_default_menu_mode
+<       - See |sqlutil-customization|
+        - Default: 3 >
+        let g:sqlutil_default_menu_mode = 3
+
+==============================================================================
+6. Customization                                 *sqlutil-customization*
+
+6.1 Cmd Terminator
 
   By default this script assumes a command is terminated by a ; If you are
   using Microsoft SQL Server a command terminator would be "go", or perhaps
@@ -686,6 +773,8 @@ database.  See |sqlutil-complementary-plugins| for more details.
   (note: using double quotes is necessary when using \n): >
             let g:sqlutil_cmd_terminator = "\ngo"
 <
+6.2 Vim Menu
+
   By default a menu is created under the Plugin menu.  Menus are useful for a
   number of reasons:
         - See a list of available commands
@@ -719,8 +808,79 @@ database.  See |sqlutil-complementary-plugins| for more details.
  Edit and Tools menu. >
             let  g:sqlutil_menu_priority = 30
 
+6.3 Vim's Syntax Support
+
+  New to 5.0 of SQLUtilities, when reformatting a SQL statement Vim's syntax
+  rules are used to determine if the keyword found (i.e. SELECT, FROM, WHERE, 
+  ...) is within a string.  Consider the following statement: >
+    SELECT 1, 'text with keywords IN FROM CASE WHERE AND OR ' FROM T1 WHERE c1 = 1
+<
+  Formatting this statement with g:sqlutil_use_syntax_support = 0 results in: >
+    SELECT 'text
+      with keywords IN
+      FROM CASE
+     WHERE 
+       AND 
+        OR '
+      FROM T1
+     WHERE c1 = 1
+<
+  As you can see the keywords found within the string were aligned like all
+  other keywords.  To address this, when the keyword is found and Vim is
+  highlighting the text (i.e. syntax on is enabled) then determine the 
+  syntax group.  If the group is within the comma separated list of 
+  groups listed in g:sqlutil_syntax_elements, then it will be bypassed.
+  The resulting query with g:sqlutil_use_syntax_support = 1 will be 
+  formatted as: >
+    SELECT 1, 'some text with sql keywords IN FROM CASE WHERE AND OR '
+      FROM T1
+     WHERE c1 = 1
+<
+  To help you determine what the correct groups are, you can install: >
+    SyntaxAttr.vim
+    http://vim.sourceforge.net/script.php?script_id=383
+<
+  Then create a mapping: >
+    nnoremap -a :call SyntaxAttr()<CR>
+<
+  Place your cursor on the word which is hightlighted in the colour you 
+  are interested in and hit -a.  The output displayed looks something like 
+  this: >
+    group: sqlString->Constant guifg=White(#ffffff)
+<
+  With this information, you can override the default for SQLUtilities 
+  using the following line in my .vimrc: >
+    let g:sqlutil_syntax_elements = 'Constant,sqlString'
+
 ==============================================================================
-6. History                                       *sqlutil-history*
+7. History                                       *sqlutil-history*
+
+  5.0.0: February 10, 2012: 
+         NF: Now an extra check is made for the Align plugin.  If not 
+             found when attempting to format a SQL statement a friendly 
+             message is shown (Enrico Teotti).
+         NF: Updated documentation added the Global Options section plus
+             updated the Customization section.
+         NF: Problem: Keywords within strings were being formatted 
+             (Olivier Laurent).
+             Solution: Added an option, g:sqlutil_use_syntax_support, to 
+             determine whether or not to use Vim's syntax support 
+             to decide if the keyword is highlighted as a "string".
+             If so, leave it and move on to the next keyword.
+             Default value is 1 (enabled).
+             See |sqlutil-customization| for details on usage.
+         NF: Added an option, g:sqlutil_syntax_elements, to 
+             allow the user to decide which syntax elements 
+             should be considered a string.
+             Default value is 'Constant,sqlString'.
+
+  4.1.0: August 18, 2010: 
+         NF: Store and reset the value of the |gdefault| option before
+             formatting SQL statements (Sebastian Kusnier).
+         BF: When g:sqlutil_align_keyword_right = 0 and 
+             g:sqlutil_align_comma = 1 commas where left aligned
+             with the keywords instead of left aligned with the 
+             column list (Per Winkvist).
 
   4.0.0: August 13, 2010: 
          NF: Added a tutorial to take users through the common features 
@@ -778,7 +938,7 @@ database.  See |sqlutil-complementary-plugins| for more details.
              the optional join words, left, right, full, inner, outer.  These
              words were missed prior to this change and only the JOIN word was
              capitalized.
-         C: Changed the default for sqlutil_use_tbl_alias = 'a' (ask) from
+         C: Changed the default for g:sqlutil_use_tbl_alias = 'a' (ask) from
              being on at all times.  This can be overridden in your vimrc.
 
   1.3.7: July 21, 2004: 
@@ -849,7 +1009,7 @@ database.  See |sqlutil-complementary-plugins| for more details.
     
 
 ==============================================================================
-7. Dependencies                                  *sqlutil-dependencies*
+8. Dependencies                                  *sqlutil-dependencies*
 
        Align.vim - Version 15 (as a minimum)
                  - Author: Charles E. Campbell, Jr.
@@ -858,7 +1018,7 @@ database.  See |sqlutil-complementary-plugins| for more details.
 
 
 ==============================================================================
-8. Complementary Plugins                       *sqlutil-complementary-plugins*
+9. Complementary Plugins                       *sqlutil-complementary-plugins*
 
        dbext.vim  - Author: Peter Bagyinszki and David Fishburn
                   - http://www.vim.org/script.php?script_id=356
@@ -884,10 +1044,10 @@ database.  See |sqlutil-complementary-plugins| for more details.
 
 
 ==============================================================================
-9. TODO                                          *sqlutil-todo*
+10. TODO                                          *sqlutil-todo*
 
   TODO:
-    1. Suggestions welcome email <dfishburn dot vim at gmail dot com>
+    1. Suggestions welcome please email <dfishburn dot vim at gmail dot com>
 
 
 ==============================================================================

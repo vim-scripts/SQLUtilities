@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	      David Fishburn <dfishburn dot vim at gmail dot com>
 "   Date:	      Nov 23, 2002
-"   Last Changed: 2010 Aug 14
-"   Version:	  4.0.0
+"   Last Changed: 2012 Feb 24
+"   Version:	  5.0.0
 "   Script:	      http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -15,10 +15,14 @@
 "
 
 " Prevent duplicate loading
-if exists("g:loaded_sqlutilities") || &cp
+if exists("g:loaded_sqlutilities")
     finish
 endif
-let g:loaded_sqlutilities = 400
+let g:loaded_sqlutilities = 500
+
+" Turn on support for line continuations when creating the script
+let s:cpo_save = &cpo
+set cpo&vim
 
 if !exists('g:sqlutil_align_where')
     let g:sqlutil_align_where = 1
@@ -100,6 +104,26 @@ if !exists('g:sqlutil_col_list_terminators')
                 \ ',constraint' .
                 \ ',\%(not\s\+null\s\+\)\?foreign'
 endif
+
+if !exists('g:sqlutil_use_syntax_support')
+    " This controls whether search and replace
+    " of various keywords as part of the formatting 
+    " of sql statements should use Vim's built in
+    " syntax support.
+    " The default to use the syntax id to help
+    " determine if keywords are within strings
+    " and therefore not aligning them.
+    let g:sqlutil_use_syntax_support = 1
+endif
+
+if !exists('g:sqlutil_syntax_elements')
+    " This controls how SQLUtilities determines if
+    " the keyword found is within a string or not.
+    " This is a comma separated list of values.
+    " The default is Constant,sqlString.
+    let g:sqlutil_syntax_elements = 'Constant,sqlString'
+endif
+
 " Determines which menu items will be recreated
 let s:sqlutil_menus_created = 0
 
@@ -333,4 +357,8 @@ function! SQLU_ToggleValue( ... )
 endfunction
 
 call SQLU_Menu()
+
+let &cpo = s:cpo_save
+unlet s:cpo_save
+
 " vim:fdm=marker:nowrap:ts=4:expandtab:ff=unix:
