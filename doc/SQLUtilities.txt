@@ -1,9 +1,9 @@
 *SQLUtilities.txt*      For Vim version 7.0. 
 
-Author:	        David Fishburn                             February 10, 2012
+Author:	        David Fishburn                             October 10, 2012
 
 SQLUtilities:   Variety of tools for working with SQL
-Version:        5.0.0
+Version:        6.0.0
 Homepage:       http://www.vim.org/scripts/script.php?script_id=492
 Feedback:	    David Fishburn <dfishburn dot vim at gmail dot com>
 
@@ -854,6 +854,12 @@ database.  See |sqlutil-complementary-plugins| for more details.
 
 ==============================================================================
 7. History                                       *sqlutil-history*
+
+  6.0.0: October 10, 2012: 
+         NF: When formatting INSERT statements, the sqlutil_align_comma
+             is also respected to place each column on a newline.
+         NF: When formatting UPDATE statements and sqlutil_align_comma is set
+             comments at the end of the line were removed (Rodrigo Laporte).
 
   5.0.0: February 10, 2012: 
          NF: Now an extra check is made for the Align plugin.  If not 

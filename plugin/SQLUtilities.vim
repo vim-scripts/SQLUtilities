@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	      David Fishburn <dfishburn dot vim at gmail dot com>
 "   Date:	      Nov 23, 2002
-"   Last Changed: 2012 Feb 24
-"   Version:	  5.0.0
+"   Last Changed: 2012 Oct 09
+"   Version:	  6.0.0
 "   Script:	      http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -18,7 +18,7 @@
 if exists("g:loaded_sqlutilities")
     finish
 endif
-let g:loaded_sqlutilities = 500
+let g:loaded_sqlutilities = 600
 
 " Turn on support for line continuations when creating the script
 let s:cpo_save = &cpo

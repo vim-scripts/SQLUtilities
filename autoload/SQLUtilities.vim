@@ -1,8 +1,8 @@
 " SQLUtilities:   Variety of tools for writing SQL
 "   Author:	      David Fishburn <dfishburn dot vim at gmail dot com>
 "   Date:	      Nov 23, 2002
-"   Last Changed: 2012 Feb 24
-"   Version:	  5.0.0
+"   Last Changed: 2012 Oct 09
+"   Version:	  6.0.0
 "   Script:	      http://www.vim.org/script.php?script_id=492
 "   License:      GPL (http://www.gnu.org/licenses/gpl.html)
 "
@@ -22,7 +22,7 @@ if v:version < 700
     echomsg "SQLUtilities: Version 2.0.0 or higher requires Vim7.  Version 1.4.1 can stil be used with Vim6."
     finish
 endif
-let g:loaded_sqlutilities_auto = 500
+let g:loaded_sqlutilities_auto = 600
 
 " Turn on support for line continuations when creating the script
 let s:cpo_save = &cpo
@@ -919,7 +919,7 @@ endfunction
 function! s:SQLU_WrapAtCommas()
     let linenum = line("'y+1")
 
-    let sql_keywords = '\<\%(select\|set\|into\|from\|values\)\>'
+    let sql_keywords = '\<\%(select\|set\|into\|from\|values\|insert\)\>'
 
     " call Decho(" Before column splitter 'y+1=".line("'<").
     " \ ":".col("'<")."  'z-1=".line("'>").":".col("'>"))
@@ -936,12 +936,15 @@ function! s:SQLU_WrapAtCommas()
                 silent! exec "normal! jmek"
 
                 let saved_linenum = linenum
-                let index = match(getline(linenum), '[,(]')
+                " let index = match(getline(linenum), '[,(]')
+                " Find the first , or (
+                let index = match(getline(linenum), (g:sqlutil_align_comma==1?'[,(]':'[,]'))
                 while index > -1
-                    " Go to character
+                    " Go to the , or (
                     call cursor(linenum, (index+1))
 
-                    " Make sure the paran is not a string
+                    " Assuming syntax is on, check to ensure the , or (
+                    " is not a string
                     if getline(linenum)[col(".")-1] == '(' &&
                                 \ synID(line("."),col("."),1) == 0
                         " if searchpair( '(', '', ')', '' ) > 0
